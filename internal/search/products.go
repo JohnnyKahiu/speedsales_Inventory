@@ -33,7 +33,6 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["values"] = value
 		return respMap
 	}
-
 	if m == "name" {
 		key := r.URL.Query().Get("key")
 
@@ -76,6 +75,24 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		if err != nil {
 			respMap["response"] = "error"
 			respMap["message"] = "failed to fetch categories"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = vals
+		return respMap
+	}
+	if m == "all_link_codes" {
+		key := r.URL.Query().Get("key")
+
+		c := products.CodeTranslator{}
+
+		c.MasterCode = key
+		vals, err := c.GetAllLinks()
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["values"] = "failed to get all links"
 			respMap["trace"] = err
 			return respMap
 		}

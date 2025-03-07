@@ -165,9 +165,10 @@ func (arg *ProdDB) LoadCodeTranslator() error {
 	return nil
 }
 
+// AddProduct adds a new product to Cache
 func (arg *ProdDB) AddProduct(val StockMaster) error {
 	start := time.Now()
-	defer fmt.Printf("\tStockMaster AddProduct took %v\n", time.Since(start))
+	defer fmt.Printf("\t PridMaster AddProduct took %v\n", time.Since(start))
 
 	update := false
 	var offerStart time.Time
@@ -201,10 +202,7 @@ func (arg *ProdDB) AddProduct(val StockMaster) error {
 		val.Label = val.ItemName
 		val.ComboItems = comboItems
 	}
-	// fmt.Printf("\n %v \n\n", val)
-
 	arg.ProductDB[val.ItemCode] = val
-	// fmt.Println(arg.ProductDB[val.ItemCode])
 
 	var ct CodeTranslator
 	ct.MasterCode = val.ItemCode
@@ -213,6 +211,7 @@ func (arg *ProdDB) AddProduct(val StockMaster) error {
 	ct.Discount = 0
 
 	arg.Codes[val.ItemCode] = ct
+	fmt.Printf("Code translation  %v\n", arg.Codes[val.ItemCode])
 
 	// pickle and save changes
 	err := arg.Pickle()
