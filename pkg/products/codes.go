@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log"
+
+	"github.com/JohnnyKahiu/speedsales_inventory/database"
 )
 
 // CodeTranslator structure holds translation of master and linked codes
@@ -52,6 +54,12 @@ func (arg *CodeTranslator) New(ctx context.Context) error {
 		return err
 	}
 
+	err = arg.AddDB(ctx)
+	if err != nil {
+		log.Println("error CodeTranslator.New()    DB txn fail    err =", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -59,5 +67,14 @@ func (arg *CodeTranslator) New(ctx context.Context) error {
 // Inserts record to database
 // returns an error if any arives
 func (arg *CodeTranslator) AddDB(ctx context.Context) error {
+	sql := `INSERT INTO code_translator(link_code, master_code, pkg_qty, discount) VALUES($1, $2, $3, $4) 
+			ON CONFLICT ON CONSTRAINT code_translator_link_code_key DO 
+			UPDATE SET master_code = $2, pkg_qty = $3, discount = $4 `
+
+	_, err := database.PgPool.Exec(ctx, sql, arg.LinkCode, arg.MasterCode, arg.PkgQty, arg.Discount)
+	if err != nil {
+		log.Println("failed adding link_code to code_translator    err =", err)
+		return err
+	}
 	return nil
 }
