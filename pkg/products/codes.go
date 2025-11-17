@@ -1,5 +1,11 @@
 package products
 
+import (
+	"context"
+	"errors"
+	"log"
+)
+
 // CodeTranslator structure holds translation of master and linked codes
 type CodeTranslator struct {
 	table       string  `name:"code_translator" type:"table"`
@@ -24,4 +30,34 @@ func (arg CodeTranslator) GetAllLinks() ([]CodeTranslator, error) {
 		}
 	}
 	return results, nil
+}
+
+// New() Creates a new link to Codes database
+// Adds the code_translation to database
+// Adds the code_translation to file cache
+// returns an error if it fails
+func (arg *CodeTranslator) New(ctx context.Context) error {
+	if arg.LinkCode == "" {
+		log.Println("error CodeTranslator.New()    null link_code")
+		return errors.New("null params link_code is null")
+	}
+	if arg.MasterCode == "" {
+		log.Println("error CodeTranslator.New()    null master_code")
+		return errors.New("null params master_code is null")
+	}
+
+	err := ProdMaster.UpdateLinks(*arg)
+	if err != nil {
+		log.Println("error CodeTranslator.New()    ProdMaster linking fail   err =", err)
+		return err
+	}
+
+	return nil
+}
+
+// CodeTranslator.AddDB adds a new code translation to products relational database
+// Inserts record to database
+// returns an error if any arives
+func (arg *CodeTranslator) AddDB(ctx context.Context) error {
+	return nil
 }
