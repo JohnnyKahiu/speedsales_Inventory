@@ -48,6 +48,7 @@ func (arg *CodeTranslator) New(ctx context.Context) error {
 		return errors.New("null params master_code is null")
 	}
 
+	// Cache links
 	err := ProdMaster.UpdateLinks(*arg)
 	if err != nil {
 		log.Println("error CodeTranslator.New()    ProdMaster linking fail   err =", err)
