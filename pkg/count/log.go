@@ -128,7 +128,8 @@ func (arg *CountLog) AddItems(ctx context.Context, tx pgx.Tx) error {
 func (arg *CountLog) Active(ctxt context.Context) ([]CountLog, error) {
 	sql := `
 		SELECT 
-			branch, trans_date, count_id, count_type, bins, suppliers, total, variance
+			branch, trans_date, count_id, count_type, 
+			bins, suppliers, total, variance
 		FROM count_log 
 		WHERE count_end IS NULL`
 
@@ -179,8 +180,9 @@ func (arg *CountLog) FetchItems(ctxt context.Context) error {
 		FROM count_items ci
 			INNER JOIN count_log cl ON ci.count_num = cl.count_id
 			LEFT JOIN stock_master m ON m.item_code = ci.item_code
-		WHERE cl.count_id = $1 AND ` + binCon
-	// fmt.Printf("%s \n vals(%v, %v)", sql, arg.CountID, arg.Bin)
+		WHERE cl.count_id = $1 AND ` + binCon + `
+		ORDER BY m.item_code ASC`
+	fmt.Printf("%s \n vals(%v, %v)", sql, arg.CountID, arg.Bin)
 
 	ctx, cancel := context.WithTimeout(ctxt, 15*time.Second)
 	defer cancel()
@@ -202,4 +204,86 @@ func (arg *CountLog) FetchItems(ctxt context.Context) error {
 	}
 
 	return nil
+}
+
+// UpdateEnd - updates end_time and variances
+// Updates count_log with now as count_end and
+// count of total items with varying balance and count
+// returns an error if it fails
+func (arg *CountLog) UpdateEnd(ctxt context.Context) error {
+	sql := `UPDATE count_log 
+			SET 
+				count_end = now() 
+				, variance = (SELECT count(*) FROM count_items WHERE counted != system_bal AND count_num = $1)
+				, total = (SELECT count(*) FROM count_items WHERE count_num = $1)
+			WHERE count_id = $1`
+
+	ctx, cancel := context.WithTimeout(ctxt, 15*time.Second)
+	defer cancel()
+
+	_, err := database.PgPool.Exec(ctx, sql, arg.CountID)
+	if err != nil {
+		log.Println("postgresql error  failed to update count_log       err =", err)
+		return err
+	}
+
+	return nil
+}
+
+// Complete  sets count_log as complete
+// Updates count_end in count_log
+// returns an error if fails
+func (arg *CountLog) Complete(ctxt context.Context) error {
+	// update variance
+	err := arg.UpdateEnd(ctxt)
+	if err != nil {
+		log.Println("error failed to complete count_log     err =", err)
+		return err
+	}
+
+	// add items to variance list
+	return nil
+}
+
+// FetchCompeted := Queries all completed stock counts between given time
+// receives a context,  start = upper time limit; end = latest time limit in string
+// returns a slice of countLogs and an error if it exists
+func (arg *CountLog) FetchCompeted(ctxt context.Context, start, end string) ([]CountLog, error) {
+	sql := `
+		SELECT 
+			count_id 
+			, count_end
+			, trans_date
+			, branch
+			, count_type
+			, total
+			, variance
+		FROM count_log 
+		WHERE count_end IS NOT NULL 
+			AND count_end::date >= $1 
+			AND count_end::date <= $2`
+
+	fmt.Printf("%v, %v, %v, %v\n\n", sql, start, end)
+	ctx, cancel := context.WithTimeout(ctxt, 15*time.Second)
+	defer cancel()
+
+	rows, err := database.PgPool.Query(ctx, sql, start, end)
+	if err != nil {
+		log.Println("postgresql error   failed to query logs     err =", err)
+		return []CountLog{}, err
+	}
+	defer rows.Close()
+
+	vals := []CountLog{}
+	for rows.Next() {
+		r := CountLog{}
+		err = rows.Scan(&r.CountID, &r.CountEnd, &r.TransDate, &r.Branch, &r.CountType, &r.Total, &r.Variance)
+		if err != nil {
+			log.Println("failed to scan count_ids     err = ", err)
+			return vals, err
+		}
+
+		vals = append(vals, r)
+	}
+	return vals, nil
 }

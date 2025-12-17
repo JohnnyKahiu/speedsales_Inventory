@@ -70,3 +70,27 @@ func (arg *Branch) FetchAll() ([]Branch, error) {
 
 	return vals, nil
 }
+
+// Update  updates branch details
+// receives a context and updates database entries
+// returns an error if it fails
+func (arg *Branch) Update(ctxt context.Context) error {
+	sql := `
+		UPDATE branches 
+		SET 
+			branch_name = $1,
+			telephone = $2,
+			email = $3
+		WHERE auto_id = $4`
+
+	ctx, cancel := context.WithTimeout(ctxt, 20*time.Second)
+	defer cancel()
+
+	_, err := database.PgPool.Exec(ctx, sql, arg.BranchName, arg.Telephone, arg.Email, arg.AutoID)
+	if err != nil {
+		log.Println("postgresql error,  failed to update branch details      err =", err)
+		return err
+	}
+
+	return nil
+}

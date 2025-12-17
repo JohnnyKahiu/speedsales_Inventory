@@ -19,10 +19,17 @@ type Locations struct {
 	Level      string        `json:"level" type:"field" sql:"VARCHAR(30) NOT NULL"`
 	Bin        string        `json:"bin" type:"field" sql:"VARCHAR(50) NOT NULL"`
 	StockList  []string      `json:"stock_list" type:"field" sql:"VARCHAR(50)[]"`
+	IsSaleLoc  bool          `json:"is_sale_loc" type:"field" sql:"BOOLEAN NOT NULL DEFAULT false"`
 	constraint string        `name:"pk_stk_loc" type:"constraint" sql:"PRIMARY KEY(auto_id)"`
 	ItemCode   string        `json:"item_code" `
 	Products   []StockMaster `json:"products"`
 	IDS        []int         `json:"ids"`
+}
+
+type StoreID struct {
+	table     string `name:"store"`
+	AutoID    int64  `json:"auto_id" type:"field" sql:"BIGSERIAL NOT NULL"`
+	StoreName string `json:"store_name" type:"field" sql:"VARCHAR NOT NULL"`
 }
 
 func genLocationsTbl() error {
@@ -54,6 +61,42 @@ func (arg *Locations) GetLocID(ctx context.Context) error {
 			log.Println("scan error    failed to scan row    err =", err)
 			return err
 		}
+	}
+
+	return nil
+}
+
+// GetSaleLoc fetches stock location data
+// following a hierarchy and stock availability to get where sale was deducted
+// returns an error if it fails
+func (arg *Locations) GetSaleLoc(ctx context.Context) error {
+	fmt.Println("\n\t store_name =", arg.StoreName)
+	sql := `SELECT 
+				auto_id
+				, store_num
+				, store_name
+				, storage_location
+			FROM stock_locations
+			WHERE store_name = $1 
+				AND $2 = ANY(stock_list) 
+				AND is_sale_loc = true
+			ORDER BY auto_id ASC 
+			LIMIT 1`
+
+	rows, err := database.PgPool.Query(ctx, sql, arg.StoreName, arg.ItemCode)
+	if err != nil {
+		log.Println("sql error   failed to fetch stock_location")
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(&arg.AutoID, &arg.StoreNum, &arg.StoreName, &arg.StorageLoc)
+		if err != nil {
+			log.Println("scan error    failed to scan row    err =", err)
+			return err
+		}
+		// log.Fatalf("\t location_id = %v\n", arg.AutoID)
 	}
 
 	return nil

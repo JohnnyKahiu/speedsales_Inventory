@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/balances"
@@ -56,13 +57,20 @@ type SaleItem struct {
 // ProcessOrder
 func (arg *SalesOrder) ProcessOrder(ctx context.Context) error {
 	for _, itm := range arg.OrderItems {
-		loc := products.Locations{StoreName: arg.Branch, StorageLoc: arg.StkLocation}
+		// get sale location using hierarchy
+		loc := products.Locations{
+			StoreName:  arg.Branch,
+			StorageLoc: arg.StkLocation,
+			ItemCode:   itm.ItemCode,
+		}
 
-		err := loc.GetLocID(ctx)
+		err := loc.GetSaleLoc(ctx)
 		if err != nil {
+			log.Fatalln("failed to get location     err =", err)
 			return err
 		}
 
+		// get product details
 		prod, _ := products.GetByCode(itm.ItemCode, true, loc.AutoID)
 		if prod.IsCombo && (prod.ComboItems != nil && len(prod.ComboItems) > 0) {
 			for _, comboItm := range prod.ComboItems {

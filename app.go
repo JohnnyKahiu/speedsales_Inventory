@@ -86,6 +86,7 @@ func (arg *ConfigFile) readConfFile() error {
 	return nil
 }
 
+// initTables creates database tables
 func initTables() error {
 	var err error
 	if err = products.GenProductsTables(); err != nil {
@@ -94,6 +95,10 @@ func initTables() error {
 
 	if err = balances.GenBalTable(); err != nil {
 		log.Println("create table error    err =", err)
+	}
+
+	if err = balances.GenArchiveTbl(); err != nil {
+		log.Println("error creating archve tables     err =", err)
 	}
 
 	if err = branches.GenBranchTbl(); err != nil {

@@ -25,6 +25,7 @@ type CountItems struct {
 	pkey         string       `name:"count_items_pk" type:"constraint" sql:"PRIMARY KEY (auto_id)"`
 	DeptName     string       `json:"dept_name"`
 	ItemName     string       `json:"item_name"`
+	AutoIDs      []int64      `json:"auto_ids"`
 	CountTrail   []countTrail `json:"count_trail"`
 }
 
@@ -76,6 +77,17 @@ func (arg *CountItems) Count(ctxt context.Context) error {
 		log.Println("error, failed to insert into count_items.    err =", err)
 		return err
 	}
+
+	return nil
+}
+
+// AdoptItem = adopts stock balance from count
+func (arg *CountItems) AdoptItem(ctxt context.Context) error {
+	// Archive current balance
+	// add new item
+	// sql := `UPDATE count_items
+	// 		SET
+	// 			`
 
 	return nil
 }
