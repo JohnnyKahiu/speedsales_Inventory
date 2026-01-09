@@ -2,6 +2,7 @@ package products
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -15,53 +16,54 @@ import (
 
 // StockMaster Holds information about a stock item
 type StockMaster struct {
-	table              string    `type:"table" name:"stock_master"`
-	ItemCode           string    `json:"item_code" type:"field" name:"item_code" sql:"VARCHAR PRIMARY KEY"`
-	ItemName           string    `json:"item_name" type:"field" name:"item_name" sql:"VARCHAR NOT NULL"`
-	ItemCost           float64   `json:"item_cost" type:"field" name:"item_cost" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
-	ItemSellingprice   float64   `json:"item_sellingprice" type:"field" name:"item_sellingprice" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
-	ItemWholesaleprice float64   `json:"item_wholesaleprice" type:"field" name:"item_wholesaleprice" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
-	ItemOfferprice     float64   `json:"item_offerprice" type:"field" name:"item_offerprice" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
-	OfferStart         time.Time `json:"offer_start" type:"field" name:"offer_start" sql:"TIMESTAMP NOT NULL DEFAULT NOW()"`
-	OfferEnd           time.Time `json:"offer_end" type:"field" name:"offer_end" sql:"TIMESTAMP NOT NULL DEFAULT NOW()"`
-	OfferQty           float64   `json:"offer_qty" type:"field" name:"offer_qty" sql:"FLOAT NOT NULL DEFAULT '0'"`
-	VatAlpha           string    `json:"vat_alpha" type:"field" name:"vat_alpha" sql:"VARCHAR(5) NOT NULL"`
-	DeptName           string    `json:"dept_name" type:"field" name:"dept_name" sql:"VARCHAR NOT NULL"`
-	DeptCode           int32     `json:"dept_code" type:"field" name:"dept_code" sql:"INTEGER NOT NULL"`
-	SupplierCode       int64     `json:"supplier_code" type:"field" name:"supplier_code" sql:"INTEGER NOT NULL DEFAULT '1'"`
-	ManufucturerCode   int64     `json:"manufucturer_code" type:"field" name:"manufucturer_code" sql:"INTEGER NOT NULL DEFAULT '0'"`
-	ManufucturerName   string    `json:"manufucturer_name" type:"field" name:"manufucturer_name" sql:"VARCHAR NOT NULL DEFAULT 'undefined'"`
-	UnitsPerPack       int       `json:"units_per_pack" type:"field" name:"units_per_pack" sql:"VARCHAR NOT NULL"`
-	KgWeight           float64   `json:"kg_weight" name:"kg_weight" type:"field" sql:"FLOAT NOT NULL"`
-	OldPrice           bool      `json:"old_price" name:"old_price" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
-	PriceChange        bool      `json:"price_change" type:"field" name:"price_change" sql:"BOOLEAN NOT NULL DEFAULT False"`
-	PriceChangeDate    time.Time `json:"price_change_date" type:"field" name:"price_change_date" sql:"TIMESTAMP"`
-	PriceEffectTime    time.Time `json:"price_effect_time" type:"field" name:"price_effect_time" sql:"TIMESTAMP"`
-	PriceEffectLead    int32     `json:"price_effect_lead" type:"field" name:"price_effect_lead" sql:"INTEGER"`
-	IsInventory        bool      `json:"is_inventory" type:"field" name:"is_inventory" sql:"BOOLEAN NOT NULL DEFAULT True"`
-	IsSerial           bool      `json:"is_serial" type:"field" name:"is_serial" sql:"BOOLEAN NOT NULL DEFAULT False"`
-	IsBatched          bool      `json:"is_batched" type:"field" name:"is_batched" sql:"BOOLEAN NOT NULL DEFAULT False"`
-	IsReturn           bool      `json:"is_return" type:"field" name:"is_return" sql:"BOOLEAN NOT NULL DEFAULT False"`
-	ReturnCode         string    `json:"return_code" type:"field" name:"return_code" sql:"VARCHAR"`
-	UpdateTime         time.Time `json:"update_time" type:"field" name:"update_time" sql:"TIMESTAMP NOT NULL DEFAULT NOW()"`
-	MinMargin          float32   `json:"min_margin" type:"field" name:"min_margin" sql:"FLOAT NOT NULL DEFAULT '0.05'"`
-	IsActive           bool      `json:"is_active" type:"field" name:"is_active" sql:"BOOL NOT NULL DEFAULT True"`
-	IsProduced         bool      `json:"is_produced" type:"field" name:"is_produced" sql:"BOOL NOT NULL DEFAULT False"`
-	Category           string    `json:"category" name:"category" type:"field" sql:"VARCHAR NOT NULL DEFAULT 'sale item'"`
-	UnitsPerRecipe     float64   `json:"units_per_recipe" name:"units_per_recipe" type:"field" sql:"FLOAT NOT NULL DEFAULT '1'"`
-	ReorderLevel       float64   `json:"reorder_level" type:"field" name:"reorder_level" sql:"FLOAT NOT NULL DEFAULT '0'"`
-	Image              string    `json:"image" name:"image" type:"field" sql:"VARCHAR"`
-	SyncServers        []string  `json:"sync_servers" name:"sync_servers" type:"field" sql:"VARCHAR[]"`
-	IsCombo            bool      `json:"is_combo" type:"field" name:"is_combo" sql:"BOOLEAN NOT NULL DEFAULT False"`
-	ComboItems         []Combo   `json:"combo_items" name:"combo_items" type:"field" sql:"JSONB"`
-	OnOffer            bool      `json:"on_offer"`
-	TillPrice          float64   `json:"till_price"`
-	VatPercent         float64   `json:"vat_percent"`
-	Margin             float64   `json:"margin"`
-	Markup             float64   `json:"mark_up"`
-	PkgQty             float64   `json:"pkg_qty"`
-	Disc               float64   `json:"Disc"`
-	Label              string    `json:"label"`
+	table              string      `type:"table" name:"stock_master"`
+	ItemCode           string      `json:"item_code" type:"field" sql:"VARCHAR PRIMARY KEY"`
+	ItemName           string      `json:"item_name" type:"field" sql:"VARCHAR NOT NULL"`
+	Description        Description `json:"description"`
+	ItemCost           float64     `json:"item_cost" type:"field" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
+	ItemSellingprice   float64     `json:"item_sellingprice" type:"field" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
+	ItemWholesaleprice float64     `json:"item_wholesaleprice" type:"field" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
+	ItemOfferprice     float64     `json:"item_offerprice" type:"field" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
+	OfferStart         time.Time   `json:"offer_start" type:"field" sql:"TIMESTAMP NOT NULL DEFAULT NOW()"`
+	OfferEnd           time.Time   `json:"offer_end" type:"field" sql:"TIMESTAMP NOT NULL DEFAULT NOW()"`
+	OfferQty           float64     `json:"offer_qty" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
+	VatAlpha           string      `json:"vat_alpha" type:"field" sql:"VARCHAR(5) NOT NULL"`
+	HsCode             string      `json:"hs_code" type:"hs_code" sql:"VARCHAR NOT NULL DEFAULT ''"`
+	DeptName           string      `json:"dept_name" type:"field" sql:"VARCHAR NOT NULL"`
+	DeptCode           int32       `json:"dept_code" type:"field" sql:"INTEGER NOT NULL"`
+	SupplierCode       int64       `json:"supplier_code" type:"field" sql:"INTEGER NOT NULL DEFAULT '1'"`
+	ManufucturerCode   int64       `json:"manufucturer_code" type:"field" sql:"INTEGER NOT NULL DEFAULT '0'"`
+	ManufucturerName   string      `json:"manufucturer_name" type:"field" sql:"VARCHAR NOT NULL DEFAULT 'undefined'"`
+	UnitsPerPack       int         `json:"units_per_pack" type:"field" sql:"VARCHAR NOT NULL"`
+	KgWeight           float64     `json:"kg_weight" type:"field" sql:"FLOAT NOT NULL"`
+	OldPrice           bool        `json:"old_price" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
+	PriceChange        bool        `json:"price_change" type:"field" sql:"BOOLEAN NOT NULL DEFAULT False"`
+	PriceChangeDate    time.Time   `json:"price_change_date" type:"field" sql:"TIMESTAMP"`
+	PriceEffectTime    time.Time   `json:"price_effect_time" type:"field" sql:"TIMESTAMP"`
+	PriceEffectLead    int32       `json:"price_effect_lead" type:"field" sql:"INTEGER"`
+	IsInventory        bool        `json:"is_inventory" type:"field" sql:"BOOLEAN NOT NULL DEFAULT True"`
+	IsSerial           bool        `json:"is_serial" type:"field" sql:"BOOLEAN NOT NULL DEFAULT False"`
+	IsBatched          bool        `json:"is_batched" type:"field" sql:"BOOLEAN NOT NULL DEFAULT False"`
+	IsReturn           bool        `json:"is_return" type:"field" sql:"BOOLEAN NOT NULL DEFAULT False"`
+	ReturnCode         string      `json:"return_code" type:"field" sql:"VARCHAR"`
+	UpdateTime         time.Time   `json:"update_time" type:"field" sql:"TIMESTAMP NOT NULL DEFAULT NOW()"`
+	MinMargin          float32     `json:"min_margin" type:"field" sql:"FLOAT NOT NULL DEFAULT '0.05'"`
+	IsActive           bool        `json:"is_active" type:"field" sql:"BOOL NOT NULL DEFAULT True"`
+	IsProduced         bool        `json:"is_produced" type:"field" sql:"BOOL NOT NULL DEFAULT False"`
+	Category           string      `json:"category" type:"field" sql:"VARCHAR NOT NULL DEFAULT 'sale item'"`
+	UnitsPerRecipe     float64     `json:"units_per_recipe" type:"field" sql:"FLOAT NOT NULL DEFAULT '1'"`
+	ReorderLevel       float64     `json:"reorder_level" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
+	Image              string      `json:"image" type:"field" sql:"VARCHAR"`
+	IsCombo            bool        `json:"is_combo" type:"field" sql:"BOOLEAN NOT NULL DEFAULT False"`
+	ComboItems         []Combo     `json:"combo_items" type:"field" sql:"JSONB"`
+	OnOffer            bool        `json:"on_offer"`
+	TillPrice          float64     `json:"till_price"`
+	VatPercent         float64     `json:"vat_percent"`
+	Margin             float64     `json:"margin"`
+	Markup             float64     `json:"mark_up"`
+	PkgQty             float64     `json:"pkg_qty"`
+	Disc               float64     `json:"Disc"`
+	Label              string      `json:"label"`
 }
 
 type Combo struct {
@@ -129,6 +131,16 @@ type StkBals struct {
 	ReorderLevel map[string]float64
 }
 
+func createStockMasterTbl() error {
+	var tblStruct StockMaster
+	return database.CreateFromStruct(tblStruct)
+}
+
+func createDeptTbl() error {
+	var tblStruct Department
+	return database.CreateFromStruct(tblStruct)
+}
+
 // GetByCode fetches product by the item code
 // Receives a string that represents the item code in search
 // and a boolean that chooses wheather to return all or only active stock items
@@ -147,13 +159,14 @@ func GetByCode(key string, all bool) (StockMaster, error) {
 	// for key, _ := range ProdMaster.ProductDB {
 	// 	fmt.Println("\t", key)
 	// }
+	fmt.Printf("\n\t code trans = %v\n", ProdMaster.Codes)
 
 	// get master code from code translation
 	ct, ok := ProdMaster.Codes[key]
 	if !ok {
 		ct.MasterCode = key
 	}
-	fmt.Println("code translator =", ct)
+	fmt.Println("\t code translator =", ct.MasterCode)
 
 	// Get combo items
 	for i, itm := range ProdMaster.ProductDB[ct.MasterCode].ComboItems {
@@ -197,14 +210,14 @@ func SearchDescription(key string) ([]StockMaster, error) {
 	var args []StockMaster
 	word_item := strings.Split(key, " ")
 	for _, val := range ProdMaster.ProductDB {
-		c := 0
+		c := 0.0
 		for _, name := range word_item {
 			if strings.Contains(strings.ToLower(val.ItemName), strings.ToLower(name)) {
 				c += 1
 			}
 		}
 
-		if c == len(word_item) {
+		if c == float64(len(word_item)) {
 			val.StockCalcs()
 			args = append(args, val)
 		}
@@ -303,10 +316,20 @@ func (val *StockMaster) StockCalcs() error {
 	return nil
 }
 
-// CreateNew()
+// CreateNew() creates a new product
+// Receives a StockMaster struct
+// Adds to database and cache
+// Returns an error if fails
 func (arg *StockMaster) CreateNew() error {
 	fmt.Println("Item Code = ", arg.ItemCode)
-	ctx := context.Background()
+	if arg.ItemCode == "" {
+		log.Println("failed to create new item. item code is required")
+		return errors.New("item code is required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	tx, err := database.PgPool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -317,6 +340,13 @@ func (arg *StockMaster) CreateNew() error {
 	err = arg.AddDB(ctx, tx)
 	if err != nil {
 		log.Println("error. Unable to Add new Item     err =", err)
+		return err
+	}
+
+	// add description to database
+	err = arg.Description.SQLAdd(ctx, tx)
+	if err != nil {
+		log.Println("error. Unable to Add new description     err =", err)
 		return err
 	}
 
@@ -356,3 +386,6 @@ func (arg *StockMaster) AddDB(ctx context.Context, tx pgx.Tx) error {
 
 	return nil
 }
+
+// AddDescription defines a product's identifiables
+// Adds into Database product, brand, size, color

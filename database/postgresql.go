@@ -55,7 +55,7 @@ func (arg DBConf) NewPgPool() (*pgxpool.Pool, error) {
 	port := os.Getenv("DB_PORT")
 
 	pgxConnString := fmt.Sprintf("postgres://%s:%s@%s:%v/%s", arg.user, arg.password, arg.Server, port, arg.DbName)
-	// fmt.Println("pgxConnString =", pgxConnString)
+	fmt.Println("pgxConnString =", pgxConnString)
 
 	// open a connection to the database
 	pgConf, err := pgxpool.ParseConfig(pgxConnString)

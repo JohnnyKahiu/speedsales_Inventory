@@ -8,7 +8,7 @@ import (
 	"github.com/JohnnyKahiu/speedsales_inventory/internal/search"
 )
 
-func BalancehGet(w http.ResponseWriter, r *http.Request) {
+func BalanceGet(w http.ResponseWriter, r *http.Request) {
 	respMap := search.GetRoutes(w, r)
 
 	jstr, err := json.Marshal(respMap)

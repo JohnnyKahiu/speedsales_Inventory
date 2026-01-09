@@ -80,6 +80,10 @@ func (arg *ConfigFile) readConfFile() error {
 	return nil
 }
 
+func initTables() error {
+	return products.GenProductsTables()
+}
+
 func infileCache() error {
 	fdbPath := fmt.Sprintf("/Data/%v/%v/", os.Getenv("SERVER_NAME"), os.Getenv("DB_NAME"))
 	variables.FDBPath = variables.Fpath + fdbPath
@@ -98,7 +102,7 @@ func infileCache() error {
 
 	err := products.ProdMaster.LoadFromDB()
 	if err != nil {
-		log.Printf("error failed to open a database connection")
+		log.Printf("error failed to cache products database    err = %v \n\n", err)
 		return err
 	}
 	return nil
@@ -106,7 +110,7 @@ func infileCache() error {
 
 func main() {
 	log.SetOutput(os.Stderr)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Ltime | log.Llongfile)
 
 	var err error
 	// fetch file path from argument
@@ -132,7 +136,6 @@ func main() {
 	}
 
 	fmt.Println("server type = ", serverType)
-	fmt.Println("init database = ", initDB)
 	if variables.Fpath == "" {
 		variables.Fpath, err = os.Getwd()
 		if err != nil {
@@ -158,6 +161,11 @@ func main() {
 		log.Fatalln("\t failed to connect Postgres Pool.    err =", err)
 	}
 	defer database.PgPool.Close()
+
+	fmt.Println("init database = ", *initDB)
+	if *initDB == "true" {
+		err = initTables()
+	}
 
 	err = infileCache()
 

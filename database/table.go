@@ -6,6 +6,7 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // GetTblSql generates the SQL for creating a table from a struct
@@ -32,6 +33,9 @@ func GenTablesFieldSQL(tblStruct any) string {
 
 // CreateFromStruct generates tables from struct
 func CreateFromStruct(tblStruct any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	sqlBody := ``
 	sqlHead := ``
 
@@ -63,9 +67,9 @@ func CreateFromStruct(tblStruct any) error {
 	sqlHead = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v ( ", tblName)
 	sql := sqlHead + sqlBody + ");"
 
-	// fmt.Println("sql =", sql)
+	fmt.Println("sql =", sql)
 	// run sql transaction
-	_, err := PgPool.Exec(context.Background(), sql)
+	_, err := PgPool.Exec(ctx, sql)
 	if err != nil {
 		log.Printf("\nerror purchases table\n \t%v", err.Error())
 		return err
@@ -80,25 +84,24 @@ func CreateFromStruct(tblStruct any) error {
 			if !strings.Contains(sqlDef, "PRIMARY KEY") && fieldName != "" {
 				sqlAlter := fmt.Sprintf("ALTER TABLE IF EXISTS %v ADD IF NOT EXISTS %v %v", tblName, fieldName, sqlDef)
 				// fmt.Println("\t", sqlAlter)
-				_, err := PgPool.Exec(context.Background(), sqlAlter)
+				_, err := PgPool.Exec(ctx, sqlAlter)
 				if err != nil {
 					fmt.Printf("\nerror Altering %v table\n \t%v", tblName, err.Error())
-					// return err
 				}
 			}
 		}
 
-		/*if val.Type().Field(i).Tag.Get("type") == "constraint" {
+		if val.Type().Field(i).Tag.Get("type") == "constraint" {
 			fieldName := val.Type().Field(i).Tag.Get("name") + ""
 			sqlDef := val.Type().Field(i).Tag.Get("sql") + " ;"
-			sqlConst := fmt.Sprintf("ALTER TABLE IF EXISTS %v ADD IF NOT EXISTS CONSTRAINT %v %v", tblName, fieldName, sqlDef)
+			sqlConst := fmt.Sprintf("ALTER TABLE IF EXISTS %v ADD CONSTRAINT %v %v", tblName, fieldName, sqlDef)
+			fmt.Println(sqlConst)
 
-			_, err := PgCon.Exec(sqlConst)
+			_, err := PgPool.Exec(ctx, sqlConst)
 			if err != nil {
 				fmt.Printf("\nerror Altering %v table\n \t%v", tblName, err.Error())
-				// return err
 			}
-		}*/
+		}
 
 	}
 
@@ -150,5 +153,47 @@ func CreateFromXStruct(tblStruct any) error {
 		log.Printf("\nerror creating %v table\n \t%v", tblName)
 		return err
 	}
+	return nil
+}
+
+// InsertFromStruct
+func InsertFromStruct(tblStruct any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	val := reflect.ValueOf(tblStruct)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	tblName := ""
+	var columns []string
+	var values []any
+	var placeholders []string
+
+	for i := 0; i < val.Type().NumField(); i++ {
+		field := val.Type().Field(i)
+		tagType := field.Tag.Get("type")
+		switch tagType {
+		case "table":
+			tblName = field.Tag.Get("name")
+		case "field":
+			colName := field.Tag.Get("json")
+			if colName != "" {
+				columns = append(columns, colName)
+				values = append(values, val.Field(i).Interface())
+				placeholders = append(placeholders, fmt.Sprintf("$%d", len(values)))
+			}
+		}
+	}
+
+	sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tblName, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	fmt.Println(sql)
+	_, err := PgPool.Exec(ctx, sql, values...)
+	if err != nil {
+		log.Printf("\nerror inserting into %v table\n \t%v", tblName, err.Error())
+		return err
+	}
+
 	return nil
 }

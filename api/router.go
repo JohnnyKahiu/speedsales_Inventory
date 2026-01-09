@@ -24,6 +24,7 @@ func NewRouter() *mux.Router {
 
 	r.HandleFunc("/products/search/{module}", SearchGet).Methods("GET", "OPTIONS")
 	r.HandleFunc("/products/balance/{module}", SearchGet).Methods("GET", "OPTIONS")
+	r.HandleFunc("/products/catalogue/{supplier}", SearchGet).Methods("GET", "OPTIONS")
 
 	r.HandleFunc("/products/{module}", PostProducts).Methods("POST", "OPTIONS")
 
