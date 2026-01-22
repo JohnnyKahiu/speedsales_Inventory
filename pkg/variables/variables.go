@@ -8,3 +8,5 @@ var FDBName string
 
 // FDBName string showing the full name of the file db in use
 var FDBPath string
+
+var Cache bool

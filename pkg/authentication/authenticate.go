@@ -1,12 +1,14 @@
 package authentication
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/grpc"
 )
 
 // User structure of user record
@@ -51,59 +53,31 @@ type User struct {
 	SessionIDs         []string  `name:"session_ids" `
 }
 
-func ValidateJWT(tokenStr string) (Users, bool) {
-	var user Users
-	token, _ := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", "HMAC")
-		}
+var mySigningKey = os.Getenv("JWT_KEY")
 
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return mySigningKey, nil
-	})
+func ValidateJWT(tokenStr string) (User, bool) {
 
-	// check if token is valid and get claims
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		var err error
-
-		// get today's date to compare with token's expiry
-		today := time.Now()
-
-		// get expiry date to compare
-		expiry, _ := time.Parse("2006-01-02 15:04", fmt.Sprintf("%v", claims["exp"]))
-
-		// check if token is expired
-		if today.After(expiry) {
-			return user, false
-		}
-
-		username := fmt.Sprintf("%v", claims["username"])
-
-		var sessionIDs []string
-
-		sessionIDs, err = getSessionID(username)
-		if err != nil {
-			return user, false
-		}
-
-		// check if session key exists for user
-		for _, sessionID := range sessionIDs {
-			if fmt.Sprintf("%v", claims["session"]) != sessionID {
-				log.Printf("\tsession id: %v is not same as \n\t claims id: %v\n\n", sessionID, claims["session"])
-				continue
-			}
-
-			// convert map to json
-			jsonStr, _ := json.Marshal(claims["rights"])
-
-			// convert json to struct
-			json.Unmarshal(jsonStr, &user)
-
-			return user, true
-		}
+	address := os.Getenv("LOGIN_RPC_ADDR")
+	inventorySvc, err := grpc.NewInventoryService(address)
+	if err != nil {
+		log.Println("failed to create inventory service: %v", err)
+		return User{}, false
 	}
-	return user, false
+
+	rights, isValid := inventorySvc.ValidateUserToken(context.Background(), fmt.Sprintf("%v", tokenStr))
+	if !isValid {
+		log.Println("authorization failed: %v", err)
+		return User{}, false
+	}
+
+	usr := User{}
+	err = json.Unmarshal([]byte(rights), &usr)
+	if err != nil {
+		log.Println("failed to unmarshal user rights: %v", err)
+		return User{}, false
+	}
+
+	return usr, true
 }
 
 func getSessionID(username string) (string, error) {

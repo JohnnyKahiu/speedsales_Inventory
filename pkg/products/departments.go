@@ -1,7 +1,124 @@
 package products
 
-type Department struct {
-	Code        int64  `json:"dept_code"`
-	Name        string `json:"dept_name"`
-	SubDeptName string `json:"sub_dept_name"`
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/JohnnyKahiu/speedsales_inventory/database"
+)
+
+// Departments structure holding all products departments
+type Departments struct {
+	table       string `name:"departments" type:"table"`
+	Code        int64  `json:"code" type:"field" sql:"SERIAL UNIQUE"`
+	Name        string `json:"name" type:"field" sql:"VARCHAR NOT NULL"`
+	SubDeptName string `json:"sub_dept_name" type:"field" sql:"VARCHAR NOT NULL"`
+	MinMargin   string `json:"min_margin" type:"field" sql:"VARCHAR NOT NULL DEFAULT '0.15'"`
+	Label       string `json:"label"`
+	composite   string `name:"departments_pkey" type:"constraint" sql:"PRIMARY KEY(name, sub_dept_name)"`
+}
+
+func createDeptTbl() error {
+	var tblStruct Departments
+	return database.CreateFromStruct(tblStruct)
+}
+
+func GetDepartments() ([]Departments, error) {
+	var deps []Departments
+
+	sql := `SELECT 
+				code
+				, name
+				, sub_dept_name
+				, min_margin
+			FROM departments`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rows, err := database.PgPool.Query(ctx, sql)
+	if err != nil {
+		return deps, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var dep Departments
+		err = rows.Scan(&dep.Code, &dep.Name, &dep.SubDeptName, &dep.MinMargin)
+		if err != nil {
+			return deps, err
+		}
+		deps = append(deps, dep)
+	}
+
+	return deps, nil
+}
+
+// CreateNew adds a new department
+// Inserts into departments table
+// returns an error if it fails
+func (arg *Departments) CreateNew() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sql := `INSERT INTO departments(name, sub_dept_name, min_margin) 
+			VALUES($1, $2, $3) 
+			RETURNING code`
+
+	rows, err := database.PgPool.Query(ctx, sql, arg.Name, arg.SubDeptName, arg.MinMargin)
+	if err != nil {
+		log.Println("error. failed to createNew() department    err =", err)
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err = rows.Scan(&arg.Code)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Update updates a department
+// Updates the department in the database
+// returns an error if it fails
+func (arg *Departments) Update() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sql := `UPDATE departments
+			SET name = $1
+				, sub_dept_name = $2
+				, min_margin = $3
+			WHERE code = $4`
+
+	_, err := database.PgPool.Query(ctx, sql, arg.Name, arg.SubDeptName, arg.MinMargin, arg.Code)
+	if err != nil {
+		log.Println("error. failed to update() department    err =", err)
+		return err
+	}
+
+	return nil
+}
+
+// Delete removes a department
+// Deletes from departments table in database
+// returns an error if it fails
+func (arg *Departments) Delete() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sql := `DELETE FROM departments WHERE code = $1`
+
+	_, err := database.PgPool.Query(ctx, sql, arg.Code)
+	if err != nil {
+		log.Println("error. failed to delete() department    err =", err)
+		return err
+	}
+
+	return nil
 }

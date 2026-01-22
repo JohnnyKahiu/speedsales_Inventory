@@ -99,17 +99,6 @@ type BalanceLog struct {
 	StkLocation string    `json:"stock_location" name:"stock_location" type:"field" sql:"VARCHAR NOT NULL"`
 }
 
-// Departments structure holding all products departments
-type Departments struct {
-	table       string `name:"departments" type:"table"`
-	DeptCode    int64  `json:"dept_code" name:"dept_code" type:"field" sql:"SERIAL UNIQUE"`
-	DeptName    string `json:"dept_name" name:"dept_name" type:"field" sql:"VARCHAR NOT NULL"`
-	SubDeptName string `json:"sub_dept_name" name:"sub_dept_name" type:"field" sql:"VARCHAR NOT NULL"`
-	Label       string `json:"label"`
-	MinMargin   string `json:"min_margin" name:"min_margin" type:"field" sql:"VARCHAR NOT NULL DEFAULT '0.5'"`
-	composite   string `name:"departments_pkey" type:"constraint" sql:"PRIMARY KEY(dept_name, sub_dept_name)"`
-}
-
 // CountedStock structer holding all items that have been counted
 type CountedStock struct {
 	ItemCode    string  `json:"item_code"`
@@ -133,11 +122,6 @@ type StkBals struct {
 
 func createStockMasterTbl() error {
 	var tblStruct StockMaster
-	return database.CreateFromStruct(tblStruct)
-}
-
-func createDeptTbl() error {
-	var tblStruct Department
 	return database.CreateFromStruct(tblStruct)
 }
 
