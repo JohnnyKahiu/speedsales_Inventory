@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
@@ -21,12 +22,13 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	vars := mux.Vars(r)
 	m := vars["module"]
 
-	if m == "new" || m == "create_new" {
+	switch m {
+	case "new", "create_new":
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Println("error. failed to read stock_master params    err =", err)
 			respMap["response"] = "error"
-			respMap["message"] = "error getting params"
+			respMap["message"] = "failed to get params"
 			return respMap
 		}
 		fmt.Println("params = ", string(b))
@@ -49,8 +51,15 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 
 		return respMap
-	}
-	if m == "link_code" {
+
+	// /products/link_code
+	// creates a new code_translator link to a product master_code
+	// expects a code_translator struct
+	// master_code
+	// link_code
+	// pkg_qty
+	// discount
+	case "link_code":
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Println("error. failed to read stock_master params    err =", err)
@@ -81,11 +90,17 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 
 		respMap["response"] = "success"
 		return respMap
-	}
-	if m == "add_to_combo" {
+
+	// /products/add_to_combo
+	// adds a product to a combo
+	// expects a combo struct
+	case "add_to_combo":
 		return respMap
-	}
-	if m == "vats" {
+
+	// /products/vats
+	// adds a new VAT
+	// expects a map[string]float64
+	case "vats":
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Println("error. failed to read stock_master params    err =", err)
@@ -113,6 +128,151 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			return respMap
 		}
 
+		respMap["response"] = "success"
+		return respMap
+
+	// /products/department
+	// creates a new department
+	// expects a department struct
+	case "department":
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Println("error. failed to read stock_master params    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "error getting params"
+			return respMap
+		}
+
+		var dept products.Departments
+		err = json.Unmarshal([]byte(b), &dept)
+		if err != nil {
+			log.Println("error failed to unmarshal json    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "unable to marshal json"
+			return respMap
+		}
+
+		err = dept.CreateNew()
+		if err != nil {
+			log.Println("error, failed to create New department     err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to create new department"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		return respMap
+	}
+
+	return respMap
+}
+
+func UpdateRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+	respMap := make(map[string]interface{})
+
+	vars := mux.Vars(r)
+	m := vars["module"]
+
+	switch m {
+	// /products/update/department -
+	// updates details about department
+	// it receives a dept struct
+	case "department":
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Println("error. failed to read stock_master params    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "error getting params"
+			return respMap
+		}
+
+		var dept products.Departments
+		err = json.Unmarshal([]byte(b), &dept)
+		if err != nil {
+			log.Println("error. failed to marshall params     err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "error getting params"
+			return respMap
+		}
+
+		err = dept.Update()
+		if err != nil {
+			log.Println("error. failed to update department     err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "error updating department"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		return respMap
+	}
+	return respMap
+}
+
+// DelRoutes handles DELETE requests for products
+// returns a map[string]interface{} with the response
+func DelRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+	respMap := make(map[string]interface{})
+	vars := mux.Vars(r)
+
+	m := vars["module"]
+
+	switch m {
+	case "department":
+		code, err := strconv.Atoi(vars["code"])
+		if err != nil {
+			log.Println("error, failed to convert code to int     err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to convert code to int"
+			return respMap
+		}
+
+		dept := products.Departments{Code: int64(code)}
+		err = dept.Delete()
+		if err != nil {
+			log.Println("error, failed to delete department     err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to delete department"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		return respMap
+	}
+
+	return respMap
+}
+
+func CatalogueGet(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+	respMap := make(map[string]interface{})
+
+	vars := mux.Vars(r)
+	by := vars["by"]
+	switch by {
+	case "supplier":
+
+	}
+	return respMap
+}
+
+func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+	respMap := make(map[string]interface{})
+
+	vars := mux.Vars(r)
+	key := vars["key"]
+
+	switch key {
+	case "departments":
+		vals, err := products.GetDepartments()
+		if err != nil {
+			log.Println("error failed getting departments    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to get departments"
+			return respMap
+		}
+		respMap["response"] = "success"
+		respMap["values"] = vals
+		return respMap
 	}
 
 	return respMap

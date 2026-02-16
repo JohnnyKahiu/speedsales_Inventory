@@ -56,15 +56,14 @@ type User struct {
 var mySigningKey = os.Getenv("JWT_KEY")
 
 func ValidateJWT(tokenStr string) (User, bool) {
-
 	address := os.Getenv("LOGIN_RPC_ADDR")
-	inventorySvc, err := grpc.NewInventoryService(address)
+	loginSvc, err := grpc.NewLoginService(address)
 	if err != nil {
-		log.Println("failed to create inventory service: %v", err)
+		log.Println("failed to create login service: %v", err)
 		return User{}, false
 	}
 
-	rights, isValid := inventorySvc.ValidateUserToken(context.Background(), fmt.Sprintf("%v", tokenStr))
+	rights, isValid := loginSvc.ValidateUserToken(context.Background(), fmt.Sprintf("%v", tokenStr))
 	if !isValid {
 		log.Println("authorization failed: %v", err)
 		return User{}, false
