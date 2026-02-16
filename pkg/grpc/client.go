@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	pb "github.com/JohnnyKahiu/speed_sales_proto/user"
@@ -41,7 +40,7 @@ func (s *LoginService) ValidateUserToken(ctx context.Context, token string) (str
 		return "", false
 	}
 
-	log.Println("resp = %v,\n", resp)
+	// log.Println("resp = %v,\n", resp)
 
 	if !resp.Valid {
 		return "", false
