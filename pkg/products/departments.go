@@ -2,6 +2,7 @@ package products
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -24,7 +25,7 @@ func createDeptTbl() error {
 	return database.CreateFromStruct(tblStruct)
 }
 
-func GetDepartments() ([]Departments, error) {
+func GetDepartments() ([]Departments, map[string]map[string]int64, error) {
 	var deps []Departments
 
 	sql := `SELECT 
@@ -32,27 +33,36 @@ func GetDepartments() ([]Departments, error) {
 				, name
 				, sub_dept_name
 				, min_margin
-			FROM departments`
+			FROM departments 
+			ORDER BY code ASC`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	rows, err := database.PgPool.Query(ctx, sql)
 	if err != nil {
-		return deps, err
+		return deps, nil, err
 	}
 	defer rows.Close()
 
+	cartegories := make(map[string]map[string]int64)
 	for rows.Next() {
 		var dep Departments
 		err = rows.Scan(&dep.Code, &dep.Name, &dep.SubDeptName, &dep.MinMargin)
 		if err != nil {
-			return deps, err
+			return deps, cartegories, err
 		}
 		deps = append(deps, dep)
+
+		if _, ok := cartegories[dep.Name]; !ok {
+			cartegories[dep.Name] = make(map[string]int64)
+		}
+
+		cartegories[dep.Name][dep.SubDeptName] = dep.Code
 	}
 
-	return deps, nil
+	fmt.Println("\n\t cartegories = ", cartegories)
+	return deps, cartegories, nil
 }
 
 // CreateNew adds a new department

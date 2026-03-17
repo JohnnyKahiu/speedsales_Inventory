@@ -263,7 +263,7 @@ func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 
 	switch key {
 	case "departments":
-		vals, err := products.GetDepartments()
+		vals, cartegories, err := products.GetDepartments()
 		if err != nil {
 			log.Println("error failed getting departments    err =", err)
 			respMap["response"] = "error"
@@ -272,6 +272,22 @@ func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 		respMap["response"] = "success"
 		respMap["values"] = vals
+		respMap["categories"] = cartegories
+		return respMap
+
+	case "sub_depts":
+		return respMap
+
+	case "vats":
+		// vals, err := products.ProdMaster	.GetVats()
+		// if err != nil {
+		// 	log.Println("error failed getting vats    err =", err)
+		// 	respMap["response"] = "error"
+		// 	respMap["message"] = "failed to get vats"
+		// 	return respMap
+		// }
+		respMap["response"] = "success"
+		respMap["values"] = "vals"
 		return respMap
 	}
 

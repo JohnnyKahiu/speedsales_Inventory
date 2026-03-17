@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
 	"github.com/gorilla/mux"
@@ -56,18 +57,26 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		return respMap
 	}
 	if m == "category" {
-		key := r.URL.Query().Get("key")
+		keys := r.URL.Query().Get("key")
 
-		vals, err := products.SearchByCategory(key)
-		if err != nil {
-			respMap["response"] = "error"
-			respMap["message"] = "failed to fetch categories"
-			respMap["trace"] = err
-			return respMap
+		// code := r.URL.Query().Get("code")
+		fmt.Println("searching dept items for code ", keys)
+
+		values := []products.StockMaster{}
+		for _, key := range strings.Split(keys, ",") {
+			vals, err := products.SearchByCategory(key)
+			if err != nil {
+				respMap["response"] = "error"
+				respMap["message"] = "failed to fetch categories"
+				respMap["trace"] = err
+				return respMap
+			}
+
+			values = append(values, vals...)
 		}
 
 		respMap["response"] = "success"
-		respMap["values"] = vals
+		respMap["values"] = values
 		return respMap
 	}
 	if m == "all" {

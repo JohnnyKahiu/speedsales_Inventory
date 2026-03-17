@@ -49,6 +49,6 @@ func NewServer(address string) error {
 	s := grpc.NewServer()
 	pb.RegisterInventoryServiceServer(s, &InventoryService{})
 
-	log.Println("Inventory service running on ", address)
+	fmt.Printf("\t grpc://%v\n", address)
 	return s.Serve(lis)
 }

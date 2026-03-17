@@ -10,6 +10,16 @@ func GenProductsTables() error {
 		log.Println("error.  failed to generate code_translator table    err =", err)
 	}
 
+	err = CreateVatsTable()
+	if err != nil {
+		log.Println("error, failed to generate vats table    err =", err)
+	}
+
+	err = CreateVatsDefaults()
+	if err != nil {
+		log.Println("error, failed to generate default vats    err =", err)
+	}
+
 	err = createSupplierTbl()
 	if err != nil {
 		log.Println("error, failed to generate supplier table    err =", err)

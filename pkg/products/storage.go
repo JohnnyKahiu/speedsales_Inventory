@@ -40,6 +40,7 @@ func (arg *ProdDB) LoadStockMaster() error {
 				, st_mas.offer_end as offer_end
 				, cast(coalesce(st_mas.offer_qty, 0) as float) as offer_qty
 				, st_mas.vat_alpha as Vat_alpha
+				, coalesce(v.rate, 0) as vat_percent
 				, coalesce(st_mas.units_per_pack::int, 1) as units
 				, st_mas.dept_code
 				, st_mas.dept_name as dept
@@ -66,6 +67,7 @@ func (arg *ProdDB) LoadStockMaster() error {
 				, coalesce(d.size, '')
 				, coalesce(d.color, '')
 			FROM stock_master st_mas 
+				LEFT JOIN vats v ON v.code = st_mas.vat_alpha
 				LEFT JOIN product_description d ON d.item_code = st_mas.item_code
 				LEFT JOIN suppliers as supp ON supp.auto_id = st_mas.supplier_code
 			`
@@ -81,7 +83,7 @@ func (arg *ProdDB) LoadStockMaster() error {
 	for rows.Next() {
 		var r StockMaster
 		err := rows.Scan(&r.ItemCode, &r.ItemName, &r.ItemSellingprice, &r.ItemCost, &r.ItemWholesaleprice, &r.ItemOfferprice, &r.OfferStart, &r.OfferEnd, &r.OfferQty,
-			&r.VatAlpha, &r.UnitsPerPack, &r.DeptCode, &r.DeptName, &r.ManufucturerCode, &r.SupplierCode, &r.ManufucturerName, &r.IsBatched, &r.IsSerial, &r.IsReturn, &r.ReturnCode,
+			&r.VatAlpha, &r.VatPercent, &r.UnitsPerPack, &r.DeptCode, &r.DeptName, &r.ManufucturerCode, &r.SupplierCode, &r.ManufucturerName, &r.IsBatched, &r.IsSerial, &r.IsReturn, &r.ReturnCode,
 			&r.PriceEffectTime, &r.KgWeight, &r.IsProduced, &r.UnitsPerRecipe, &r.Image, &r.IsActive, &r.IsInventory,
 			&r.Description.Product, &r.Description.BrandName, &r.Description.Category,
 			&r.Description.Category1, &r.Description.Category2, &r.Description.Category3, &r.Description.Size, &r.Description.Color)
@@ -304,7 +306,7 @@ func (arg *ProdDB) Pickle() error {
 	arg.mx.Lock()
 	defer arg.mx.Unlock()
 	picklePath := filepath.Join(variables.FDBPath, "products.bin")
-	fmt.Println("pickle path =", picklePath)
+	// fmt.Println("pickle path =", picklePath)
 
 	err = os.WriteFile(picklePath, buf.Bytes(), 0666)
 	if err != nil {
@@ -320,14 +322,14 @@ func (arg *ProdDB) LoadFromDB() error {
 		log.Println("error. failed to load from stock_master    err =", err)
 		return err
 	}
-	fmt.Println("\t\t Loaded stock_master")
+	// fmt.Println("\t\t Loaded stock_master")
 
 	err = arg.LoadCodeTranslator()
 	if err != nil {
 		log.Println("error. failed to load code translator    err =", err)
 		return err
 	}
-	fmt.Println("\t\t Loaded code translations")
+	// fmt.Println("\t\t Loaded code translations")
 
 	err = arg.Pickle()
 	if err != nil {

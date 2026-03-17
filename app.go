@@ -178,7 +178,9 @@ func main() {
 	}
 
 	go func() {
-		err = grpc.NewServer(address + ":" + os.Getenv("GRPC_SERVER_PORT"))
+		grpcAddress := fmt.Sprintf("%v:%v", address, os.Getenv("GRPC_SERVER_PORT"))
+
+		err = grpc.NewServer(grpcAddress)
 		if err != nil {
 			log.Fatal("failed to start grpc server    err =", err)
 		}
@@ -188,7 +190,7 @@ func main() {
 
 	r := api.NewRouter()
 	if *isTLS {
-		fmt.Printf("\thttps://%v:%v\n", address, port)
+		fmt.Printf("\t https://%v:%v\n", address, port)
 		srv := &http.Server{
 			Addr:    address + ":" + port,
 			Handler: r,
@@ -202,7 +204,7 @@ func main() {
 			log.Fatal("failed to start tls server    err =", err)
 		}
 	} else {
-		fmt.Printf("\thttp://%v:%v\n", address, port)
+		fmt.Printf("\t http://%v:%v\n", address, port)
 		// http.ListenAndServeTLS(address+":"+port, "localhost.crt", "localhost.key", r)
 
 		http.ListenAndServe(address+":"+port, r)
