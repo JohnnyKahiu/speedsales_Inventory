@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,8 @@ import (
 	"github.com/JohnnyKahiu/speedsales_inventory/api"
 	"github.com/JohnnyKahiu/speedsales_inventory/api/grpc"
 	"github.com/JohnnyKahiu/speedsales_inventory/database"
+	"github.com/JohnnyKahiu/speedsales_inventory/internal/broker"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/balances"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/variables"
 	"github.com/joho/godotenv"
@@ -82,7 +85,16 @@ func (arg *ConfigFile) readConfFile() error {
 }
 
 func initTables() error {
-	return products.GenProductsTables()
+	var err error
+	if err = products.GenProductsTables(); err != nil {
+		log.Println("error creating products tbl     err = ", err)
+	}
+
+	if err = balances.GenBalTable(); err != nil {
+		log.Println("create table error    err =", err)
+	}
+
+	return err
 }
 
 func infileCache() error {
@@ -176,6 +188,20 @@ func main() {
 	if configs.Listen != "card" {
 		address = "0.0.0.0"
 	}
+
+	topic := os.Getenv("KAFKA_TOPIC")
+	if topic == "" {
+		topic = "sales_orders"
+	}
+	kf := broker.Kafka{
+		Broker: os.Getenv("KAFKA_BROKER"),
+		Topic:  topic,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go kf.StartSalesConsumer(ctx)
 
 	go func() {
 		grpcAddress := fmt.Sprintf("%v:%v", address, os.Getenv("GRPC_SERVER_PORT"))

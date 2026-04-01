@@ -71,7 +71,7 @@ func CreateFromStruct(tblStruct any) error {
 	// run sql transaction
 	_, err := PgPool.Exec(ctx, sql)
 	if err != nil {
-		log.Printf("\nerror purchases table\n \t%v", err.Error())
+		log.Printf("\nerror %s table\n \t%v", tblName, err.Error())
 		return err
 	}
 

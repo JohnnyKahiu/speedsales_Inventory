@@ -56,6 +56,25 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["values"] = values
 		return respMap
 	}
+	if m == "department" {
+		keys := r.URL.Query().Get("key")
+
+		fmt.Println("searching dept name   keyword =", keys)
+
+		vals, err := products.SearchDeptByName(keys)
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "failed to fetch categories"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		fmt.Println("values =", vals)
+
+		respMap["response"] = "success"
+		respMap["values"] = vals
+		return respMap
+	}
 	if m == "category" {
 		keys := r.URL.Query().Get("key")
 
@@ -63,6 +82,21 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		fmt.Println("searching dept items for code ", keys)
 
 		values := []products.StockMaster{}
+
+		if keys == "" {
+			values, err := products.All(100)
+			if err != nil {
+				respMap["response"] = "error"
+				respMap["message"] = "failed to fetch categories"
+				respMap["trace"] = err
+				return respMap
+			}
+
+			respMap["response"] = "success"
+			respMap["values"] = values
+			return respMap
+		}
+
 		for _, key := range strings.Split(keys, ",") {
 			vals, err := products.SearchByCategory(key)
 			if err != nil {

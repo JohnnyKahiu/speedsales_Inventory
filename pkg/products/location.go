@@ -10,8 +10,7 @@ type Locations struct {
 	StorageLoc string `json:"storage_location" type:"field" sql:"VARCHAR NOT NULL"`
 	Aisle      string `json:"aisle" type:"field" sql:"VARCHAR NOT NULL"`
 	Level      string `json:"level" type:"field" sql:"VARCHAR NOT NULL"`
-	Row        string `json:"row" type:"field" sql:"VARCHAR NOT NULL"`
-	Column     string `json:"column" type:"field" sql:"VARCHAR NOT NULL"`
+	constraint string `name:"pk_stk_loc" type:"constraint" sql:"PRIMARY KEY(auto_id)"`
 }
 
 func genLocationsTbl() error {

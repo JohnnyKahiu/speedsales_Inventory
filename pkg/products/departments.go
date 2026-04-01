@@ -132,3 +132,42 @@ func (arg *Departments) Delete() error {
 
 	return nil
 }
+
+// SearchByName searches for departments by name
+// Returns a slice of Departments that match the name
+// Returns an error if the search fails
+func SearchDeptByName(key string) ([]Departments, error) {
+	var deps []Departments
+
+	search := "%" + key + "%"
+
+	sql := fmt.Sprintf(`SELECT 
+				code
+				, name
+				, sub_dept_name
+				, min_margin
+			FROM departments 
+			WHERE sub_dept_name ILIKE '%v' 
+			ORDER BY code ASC`, search)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rows, err := database.PgPool.Query(ctx, sql)
+	if err != nil {
+		log.Println("error. failed to searchByName() department    err =", err)
+		return deps, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var dep Departments
+		err = rows.Scan(&dep.Code, &dep.Name, &dep.SubDeptName, &dep.MinMargin)
+		if err != nil {
+			return deps, err
+		}
+		deps = append(deps, dep)
+	}
+
+	return deps, nil
+}

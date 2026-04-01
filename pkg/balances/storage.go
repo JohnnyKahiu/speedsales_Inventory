@@ -17,8 +17,7 @@ var BalMaster BalDB
 func (arg *BalDB) LoadBalMaster() error {
 	sql := `SELECT 
 				item_code
-				, branch
-				, stk_location
+				, CONCAT(branch, '', stk_location) as location_id
 				, SUM(qty)
 			FROM stk_mvmt_live 
 			GROUP BY item_code, branch, stk_location
@@ -32,7 +31,7 @@ func (arg *BalDB) LoadBalMaster() error {
 	vals := []Balance{}
 	for rows.Next() {
 		var r Balance
-		err := rows.Scan(&r.ItemCode, &r.Branch, &r.StkLocation, &r.Bal)
+		err := rows.Scan(&r.ItemCode, &r.LocationID, &r.Bal)
 		if err != nil {
 			return err
 		}
