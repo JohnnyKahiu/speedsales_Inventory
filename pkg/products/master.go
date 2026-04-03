@@ -224,12 +224,6 @@ func SearchByCategory(key string) ([]StockMaster, error) {
 		if fmt.Sprintf("%v", item.DeptCode) == key && item.IsActive {
 			item.StockCalcs()
 
-			fmt.Printf("\n\t========== %v ========\n", item.ItemName)
-			fmt.Printf("\titem_sellingprice = %v\n", item.ItemSellingprice)
-			fmt.Printf("\titem_cost         = %v\n", item.ItemCost)
-			fmt.Printf("\tmargin            = %v\n", item.Margin)
-			fmt.Printf("\tmarkup            = %v\n", item.Markup)
-
 			vals = append(vals, item)
 		}
 	}

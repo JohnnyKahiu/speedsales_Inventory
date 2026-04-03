@@ -74,7 +74,7 @@ func (b *Kafka) StartSalesConsumer(ctx context.Context) {
 	})
 	defer reader.Close()
 
-	log.Printf("consumer started  broker=%s  topic=%s", b.Broker, b.Topic)
+	// log.Printf("consumer started  broker=%s  topic=%s", b.Broker, b.Topic)
 
 	for {
 		msg, err := reader.ReadMessage(ctx)
@@ -87,7 +87,7 @@ func (b *Kafka) StartSalesConsumer(ctx context.Context) {
 			continue
 		}
 
-		fmt.Printf("val = %s\n", msg.Value)
+		// fmt.Printf("val = %s\n", msg.Value)
 		order := SalesOrder{}
 
 		if err := json.Unmarshal(msg.Value, &order); err != nil {
@@ -97,7 +97,7 @@ func (b *Kafka) StartSalesConsumer(ctx context.Context) {
 
 		err = order.ProcessOrder(ctx)
 		if err != nil {
-			log.Println("salesorder error    failed to process order    err =")
+			log.Println("salesorder error    failed to process order    err =", err)
 		}
 
 	}

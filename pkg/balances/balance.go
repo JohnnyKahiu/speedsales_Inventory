@@ -72,7 +72,30 @@ func (arg *Balance) GetBal() error {
 
 func (arg *TxnLog) LogBal(ctx context.Context) error {
 	sql := `INSERT INTO txn_log(description, txn_id, location_id, item_code, qty_in, qty_out)
-			VALUES($1, $2, $3, $4, $5, $6)`
+			VALUES($1, $2, $3, $4, $5, $6) 
+			ON CONFLICT ON CONSTRAINT pk_txn_log 
+			DO UPDATE SET qty_in = excluded.qty_in, qty_out = excluded.qty_out`
+
+	c, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	_, err := database.PgPool.Exec(c, sql, arg.Description, arg.TxnID, arg.LocationID, arg.ItemCode, arg.QtyIn, arg.QtyOut)
+	if err != nil {
+		log.Println("sql error. failed to insert into txn_log    err =", err)
+		return err
+	}
+
+	log.Println("transaction logged successfully")
+
+	return nil
+}
+
+func (arg *TxnLog) RemoveBal(ctx context.Context) error {
+	sql := `UPDATE txn_log
+			SET
+				qty_in = 0
+				, qty_out = 0
+			WHERE description = $1 AND txn_id = $2`
 
 	c, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

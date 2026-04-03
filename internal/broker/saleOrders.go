@@ -53,32 +53,59 @@ type SaleItem struct {
 	ReceiptItem string    `json:"receipt_item"`
 }
 
+// ProcessOrder
 func (arg *SalesOrder) ProcessOrder(ctx context.Context) error {
 	for _, itm := range arg.OrderItems {
+		loc := products.Locations{StoreName: arg.Branch, StorageLoc: arg.StkLocation}
+
+		err := loc.GetLocID(ctx)
+		if err != nil {
+			return err
+		}
+
 		prod, _ := products.GetByCode(itm.ItemCode, true)
 		if prod.IsCombo && (prod.ComboItems != nil && len(prod.ComboItems) > 0) {
 			for _, comboItm := range prod.ComboItems {
-				bal := balances.TxnLog{Description: "saless orders"}
+				bal := balances.TxnLog{Description: "sales orders"}
 
+				bal.LocationID = loc.AutoID
 				bal.ItemCode = comboItm.ItemCode
 				bal.QtyOut = itm.Quantity * comboItm.Quantity
 				bal.TxnID = fmt.Sprintf("%v-%v", itm.ReceiptItem, comboItm.ItemCode)
 
+				if itm.State == "DELETED" || itm.State == "VOIDED" {
+					err := bal.RemoveBal(ctx)
+					if err != nil {
+						return err
+					}
+
+					continue
+				}
 				err := bal.LogBal(ctx)
 				if err != nil {
 					return err
 				}
+
 			}
 			continue
 		}
 
 		bal := balances.TxnLog{Description: "sales orders"}
 
+		bal.LocationID = loc.AutoID
 		bal.ItemCode = itm.ItemCode
 		bal.QtyOut = itm.Quantity
 		bal.TxnID = itm.ReceiptItem
 
-		err := bal.LogBal(ctx)
+		if itm.State == "DELETED" || itm.State == "VOIDED" {
+			err := bal.RemoveBal(ctx)
+			if err != nil {
+				return err
+			}
+
+			continue
+		}
+		err = bal.LogBal(ctx)
 		if err != nil {
 			return err
 		}
