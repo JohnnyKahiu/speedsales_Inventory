@@ -20,8 +20,8 @@ func (arg *BalDB) LoadBalMaster() error {
 				, CONCAT(branch, '', stk_location) as location_id
 				, SUM(qty)
 			FROM stk_mvmt_live 
-			GROUP BY item_code, branch, stk_location
-		`
+			GROUP BY item_code, branch, stk_location `
+
 	rows, err := database.PgPool.Query(context.Background(), sql)
 	if err != nil {
 		return err

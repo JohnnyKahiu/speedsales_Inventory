@@ -74,15 +74,21 @@ func (arg *SalesOrder) ProcessOrder(ctx context.Context) error {
 				bal.TxnID = fmt.Sprintf("%v-%v", itm.ReceiptItem, comboItm.ItemCode)
 
 				if itm.State == "DELETED" || itm.State == "VOIDED" {
-					err := bal.RemoveBal(ctx)
-					if err != nil {
+					if err := bal.RemoveBal(ctx); err != nil {
+						return err
+					}
+
+					if err := bal.SaveBal(ctx); err != nil {
 						return err
 					}
 
 					continue
 				}
-				err := bal.LogBal(ctx)
-				if err != nil {
+				if err := bal.LogBal(ctx); err != nil {
+					return err
+				}
+
+				if err := bal.SaveBal(ctx); err != nil {
 					return err
 				}
 
@@ -98,15 +104,21 @@ func (arg *SalesOrder) ProcessOrder(ctx context.Context) error {
 		bal.TxnID = itm.ReceiptItem
 
 		if itm.State == "DELETED" || itm.State == "VOIDED" {
-			err := bal.RemoveBal(ctx)
-			if err != nil {
+			if err := bal.RemoveBal(ctx); err != nil {
+				return err
+			}
+
+			if err := bal.SaveBal(ctx); err != nil {
 				return err
 			}
 
 			continue
 		}
-		err = bal.LogBal(ctx)
-		if err != nil {
+
+		if err = bal.LogBal(ctx); err != nil {
+			return err
+		}
+		if err := bal.SaveBal(ctx); err != nil {
 			return err
 		}
 	}

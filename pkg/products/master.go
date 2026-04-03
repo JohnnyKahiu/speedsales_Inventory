@@ -64,6 +64,7 @@ type StockMaster struct {
 	PkgQty             float64     `json:"pkg_qty"`
 	Disc               float64     `json:"Disc"`
 	Label              string      `json:"label"`
+	Bal                float64     `json:"Bal"`
 }
 
 type Combo struct {
@@ -224,11 +225,15 @@ func SearchByCategory(key string) ([]StockMaster, error) {
 		if fmt.Sprintf("%v", item.DeptCode) == key && item.IsActive {
 			item.StockCalcs()
 
-			vals = append(vals, item)
+			if item.ItemCode != "" {
+				vals = append(vals, item)
+			}
 		}
 	}
 
-	sort.Slice(vals, func(i, j int) bool { return vals[i].ItemName < vals[j].ItemName })
+	sort.Slice(vals, func(i, j int) bool {
+		return vals[i].ItemName < vals[j].ItemName
+	})
 
 	return vals, nil
 }

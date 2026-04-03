@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/JohnnyKahiu/speedsales_inventory/database"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
+	"github.com/jackc/pgx/v5"
 )
 
 type Balance struct {
@@ -70,43 +72,91 @@ func (arg *Balance) GetBal() error {
 	return nil
 }
 
+// LogBal
+// returns an error if it fails
 func (arg *TxnLog) LogBal(ctx context.Context) error {
-	sql := `INSERT INTO txn_log(description, txn_id, location_id, item_code, qty_in, qty_out)
-			VALUES($1, $2, $3, $4, $5, $6) 
-			ON CONFLICT ON CONSTRAINT pk_txn_log 
-			DO UPDATE SET qty_in = excluded.qty_in, qty_out = excluded.qty_out`
-
 	c, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	_, err := database.PgPool.Exec(c, sql, arg.Description, arg.TxnID, arg.LocationID, arg.ItemCode, arg.QtyIn, arg.QtyOut)
+	tx, err := database.PgPool.BeginTx(c, pgx.TxOptions{})
+	if err != nil {
+		log.Println("logBal error   err =", err)
+		return err
+	}
+	defer tx.Rollback(c)
+
+	sql := `INSERT INTO txn_log(description, txn_id, location_id, item_code, qty_in, qty_out)
+			VALUES($1, $2, $3, $4, $5, $6) 
+			ON CONFLICT ON CONSTRAINT pk_txn_log 
+			DO UPDATE 
+			SET 
+				qty_in = excluded.qty_in
+				, qty_out = excluded.qty_out`
+
+	_, err = tx.Exec(c, sql, arg.Description, arg.TxnID, arg.LocationID, arg.ItemCode, arg.QtyIn, arg.QtyOut)
 	if err != nil {
 		log.Println("sql error. failed to insert into txn_log    err =", err)
 		return err
 	}
 
-	log.Println("transaction logged successfully")
+	sql = ` SELECT 
+				SUM(qty_in - qty_out) as bal 
+			FROM txn_log 
+			WHERE location_id = $1 AND item_code = $2`
+	if err = tx.QueryRow(c, sql, arg.LocationID, arg.ItemCode).Scan(&arg.Bal); err != nil {
+		log.Println("sql error, failed to fetch balance     err =", err)
+		return err
+	}
 
-	return nil
+	log.Println("transaction logged successfully")
+	return tx.Commit(c)
 }
 
+// RemoveBal
+// returns an error if it fails
 func (arg *TxnLog) RemoveBal(ctx context.Context) error {
+	c, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	tx, err := database.PgPool.BeginTx(c, pgx.TxOptions{})
+	if err != nil {
+		log.Println("logBal error   err =", err)
+		return err
+	}
+	defer tx.Rollback(c)
+
 	sql := `UPDATE txn_log
 			SET
 				qty_in = 0
 				, qty_out = 0
 			WHERE description = $1 AND txn_id = $2`
 
-	c, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	_, err := database.PgPool.Exec(c, sql, arg.Description, arg.TxnID, arg.LocationID, arg.ItemCode, arg.QtyIn, arg.QtyOut)
+	_, err = tx.Exec(c, sql, arg.Description, arg.TxnID, arg.LocationID, arg.ItemCode, arg.QtyIn, arg.QtyOut)
 	if err != nil {
 		log.Println("sql error. failed to insert into txn_log    err =", err)
 		return err
 	}
 
-	log.Println("transaction logged successfully")
+	sql = ` SELECT 
+				SUM(qty_in - qty_out) as bal 
+			FROM txn_log 
+			WHERE location_id = $1 AND item_code = $2`
+	if err = tx.QueryRow(c, sql, arg.LocationID, arg.ItemCode).Scan(&arg.Bal); err != nil {
+		log.Println("sql error, failed to fetch balance     err =", err)
+		return err
+	}
 
-	return nil
+	log.Println("transaction logged successfully")
+	return tx.Commit(c)
+}
+
+// SaveBal saves the balance to cache
+// returns an error if it fails
+func (arg *TxnLog) SaveBal(ctx context.Context) error {
+	// cache the  balance
+	product := products.ProdMaster.ProductDB[arg.ItemCode]
+	product.Bal = arg.Bal
+
+	products.ProdMaster.ProductDB[arg.ItemCode] = product
+	return products.ProdMaster.Pickle()
 }

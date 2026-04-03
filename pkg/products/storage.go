@@ -66,6 +66,7 @@ func (arg *ProdDB) LoadStockMaster() error {
 				, coalesce(d.category_3, '')
 				, coalesce(d.size, '')
 				, coalesce(d.color, '')
+				--, bal.balance
 			FROM stock_master st_mas 
 				LEFT JOIN vats v ON v.code = st_mas.vat_alpha
 				LEFT JOIN product_description d ON d.item_code = st_mas.item_code
