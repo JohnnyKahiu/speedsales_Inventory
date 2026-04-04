@@ -58,6 +58,7 @@ func (arg *ProdDB) LoadStockMaster() error {
 				, coalesce(st_mas.image, '../../static/images/')
 				, st_mas.is_active
 				, st_mas.is_inventory
+				, coalesce(bal.balance::varchar, '{}')
 				, coalesce(d.product, '')
 				, coalesce(d.brand_name, '')
 				, coalesce(d.category, '')
@@ -66,12 +67,16 @@ func (arg *ProdDB) LoadStockMaster() error {
 				, coalesce(d.category_3, '')
 				, coalesce(d.size, '')
 				, coalesce(d.color, '')
-				--, bal.balance
 			FROM stock_master st_mas 
 				LEFT JOIN vats v ON v.code = st_mas.vat_alpha
 				LEFT JOIN product_description d ON d.item_code = st_mas.item_code
 				LEFT JOIN suppliers as supp ON supp.auto_id = st_mas.supplier_code
-			`
+				LEFT JOIN (SELECT 
+								item_code
+								, CONCAT('{',location_id, ': ', SUM(qty_in - qty_out), '}') as balance 
+							FROM txn_log GROUP BY item_code, location_id
+					) bal ON bal.item_code = st_mas.item_code
+			 `
 
 	rows, err := database.PgPool.Query(context.Background(), sql)
 	if err != nil {
@@ -82,10 +87,11 @@ func (arg *ProdDB) LoadStockMaster() error {
 
 	arg.ProductDB = make(map[string]StockMaster)
 	for rows.Next() {
+		balanceMapStr := ""
 		var r StockMaster
 		err := rows.Scan(&r.ItemCode, &r.ItemName, &r.ItemSellingprice, &r.ItemCost, &r.ItemWholesaleprice, &r.ItemOfferprice, &r.OfferStart, &r.OfferEnd, &r.OfferQty,
 			&r.VatAlpha, &r.VatPercent, &r.UnitsPerPack, &r.DeptCode, &r.DeptName, &r.ManufucturerCode, &r.SupplierCode, &r.ManufucturerName, &r.IsBatched, &r.IsSerial, &r.IsReturn, &r.ReturnCode,
-			&r.PriceEffectTime, &r.KgWeight, &r.IsProduced, &r.UnitsPerRecipe, &r.Image, &r.IsActive, &r.IsInventory,
+			&r.PriceEffectTime, &r.KgWeight, &r.IsProduced, &r.UnitsPerRecipe, &r.Image, &r.IsActive, &r.IsInventory, &balanceMapStr,
 			&r.Description.Product, &r.Description.BrandName, &r.Description.Category,
 			&r.Description.Category1, &r.Description.Category2, &r.Description.Category3, &r.Description.Size, &r.Description.Color)
 		if err != nil {
@@ -94,6 +100,11 @@ func (arg *ProdDB) LoadStockMaster() error {
 		}
 		r.Label = r.ItemCode
 
+		json.Unmarshal([]byte(balanceMapStr), &r.Balance)
+
+		if r.ItemCode == "" {
+			continue
+		}
 		arg.ProductDB[r.ItemCode] = r
 	}
 
