@@ -155,7 +155,19 @@ func (arg *TxnLog) RemoveBal(ctx context.Context) error {
 func (arg *TxnLog) SaveBal(ctx context.Context) error {
 	// cache the  balance
 	product := products.ProdMaster.ProductDB[arg.ItemCode]
+	LocBal := product.Balance[arg.LocationID]
+	LocBal = arg.Bal
+
+	if product.Balance == nil {
+		product.Balance = make(map[int64]float64)
+	}
+
+	product.Balance[arg.LocationID] = LocBal
 	product.Bal = arg.Bal
+
+	if products.ProdMaster.ProductDB == nil {
+		products.ProdMaster.ProductDB = make(map[string]products.StockMaster)
+	}
 
 	products.ProdMaster.ProductDB[arg.ItemCode] = product
 	return products.ProdMaster.Pickle()

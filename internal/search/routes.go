@@ -1,11 +1,13 @@
 package search
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/authentication"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
 	"github.com/gorilla/mux"
 )
@@ -15,16 +17,39 @@ import (
 func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	respMap := make(map[string]interface{})
 
+	userStr := r.Header.Get("user_details")
+	if userStr == "" {
+		respMap["response"] = "error"
+		respMap["message"] = "user details not found"
+		return respMap
+	}
+
+	details := authentication.User{}
+	err := json.Unmarshal([]byte(userStr), &details)
+	if err != nil {
+		return respMap
+	}
+
 	vars := mux.Vars(r)
 
 	m := vars["module"]
 
-	if m == "code" {
+	switch m {
+	case "code":
 		fmt.Println("searching by code")
 		key := r.URL.Query().Get("key")
 
+		loc := r.Header.Get("location_id")
+		locID := int64(0)
+		if loc != "" {
+			locID, err = strconv.ParseInt(loc, 10, 64)
+			if err != nil {
+				locID = 0
+			}
+		}
+
 		// get values from database
-		value, err := products.GetByCode(key, false)
+		value, err := products.GetByCode(key, false, locID)
 		if err != nil {
 			respMap["response"] = "error"
 			respMap["message"] = "failed to get_by_code"
@@ -39,12 +64,21 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 		respMap["values"] = value
 		return respMap
-	}
-	if m == "name" {
+
+	case "name":
 		key := r.URL.Query().Get("key")
 
+		loc := r.Header.Get("location_id")
+		locID := int64(0)
+		if loc != "" {
+			locID, err = strconv.ParseInt(loc, 10, 64)
+			if err != nil {
+				locID = 0
+			}
+		}
+
 		// get values from database
-		values, err := products.SearchDescription(key)
+		values, err := products.SearchDescription(key, locID)
 		if err != nil {
 			respMap["response"] = "error"
 			respMap["message"] = "failed searching"
@@ -55,8 +89,8 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		respMap["values"] = values
 		return respMap
-	}
-	if m == "department" {
+
+	case "department":
 		keys := r.URL.Query().Get("key")
 
 		fmt.Println("searching dept name   keyword =", keys)
@@ -74,9 +108,18 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		respMap["values"] = vals
 		return respMap
-	}
-	if m == "category" {
+
+	case "category":
 		keys := r.URL.Query().Get("key")
+
+		loc := r.Header.Get("location_id")
+		locID := int64(0)
+		if loc != "" {
+			locID, err = strconv.ParseInt(loc, 10, 64)
+			if err != nil {
+				locID = 0
+			}
+		}
 
 		// code := r.URL.Query().Get("code")
 		fmt.Println("searching dept items for code ", keys)
@@ -98,7 +141,7 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 
 		for _, key := range strings.Split(keys, ",") {
-			vals, err := products.SearchByCategory(key)
+			vals, err := products.SearchByCategory(key, locID)
 			if err != nil {
 				respMap["response"] = "error"
 				respMap["message"] = "failed to fetch categories"
@@ -112,8 +155,11 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		respMap["values"] = values
 		return respMap
-	}
-	if m == "all" {
+
+	case "inventory_items":
+		return respMap
+
+	case "all":
 		l := r.URL.Query().Get("limit")
 		if l == "" {
 			l = "100"
@@ -131,8 +177,8 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		respMap["values"] = vals
 		return respMap
-	}
-	if m == "all_link_codes" {
+
+	case "all_link_codes":
 		key := r.URL.Query().Get("key")
 
 		c := products.CodeTranslator{}
@@ -149,12 +195,30 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		respMap["values"] = vals
 		return respMap
-	}
-	if m == "vats" {
+
+	case "vats":
 		vals := products.ProdMaster.Vats
 
 		respMap["response"] = "success"
-		respMap["vals"] = vals
+		respMap["values"] = vals
+		return respMap
+
+	case "bin-details":
+		fmt.Println("fetching bin-details")
+		loc_id := r.URL.Query().Get("id")
+		loc := products.Locations{}
+		loc.AutoID, _ = strconv.ParseInt(loc_id, 10, 64)
+
+		err := loc.Details(r.Context())
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "failed to fetch details"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["vals"] = loc
 		return respMap
 	}
 

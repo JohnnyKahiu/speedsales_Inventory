@@ -63,7 +63,7 @@ func (arg *SalesOrder) ProcessOrder(ctx context.Context) error {
 			return err
 		}
 
-		prod, _ := products.GetByCode(itm.ItemCode, true)
+		prod, _ := products.GetByCode(itm.ItemCode, true, loc.AutoID)
 		if prod.IsCombo && (prod.ComboItems != nil && len(prod.ComboItems) > 0) {
 			for _, comboItm := range prod.ComboItems {
 				bal := balances.TxnLog{Description: "sales orders"}

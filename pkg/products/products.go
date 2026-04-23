@@ -37,7 +37,7 @@ func GenProductsTables() error {
 
 	err = createDeptTbl()
 	if err != nil {
-		log.Println("error, failed to generate department table    err =", err)
+		log.Fatalln("error, failed to generate department table    err =", err)
 	}
 
 	err = genDescriptionTbl()

@@ -28,6 +28,7 @@ type User struct {
 	RemoteLogin        bool      `json:"remote_login" name:"remote_login" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`
 	AdoptStockcount    bool      `json:"adopt_stockcount" name:"adopt_stockcount" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`
 	CompleteStockcount bool      `json:"complete_stockcount" name:"complete_stockcount" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`
+	Branch             string    `json:"branch"`
 	StkLocation        string    `json:"stk_location" name:"stk_location" type:"field" sql:"VARCHAR NOT NULL DEFAULT 'shop'"`
 	SessionID          string    `json:"session_id" name:"session_id" type:"field" sql:"VARCHAR NOT NULL DEFAULT ''"`
 	PostDispatch       bool      `json:"post_dispatch" name:"post_dispatch" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`

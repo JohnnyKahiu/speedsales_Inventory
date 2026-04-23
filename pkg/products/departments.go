@@ -11,13 +11,14 @@ import (
 
 // Departments structure holding all products departments
 type Departments struct {
-	table       string `name:"departments" type:"table"`
-	Code        int64  `json:"code" type:"field" sql:"SERIAL UNIQUE"`
-	Name        string `json:"name" type:"field" sql:"VARCHAR NOT NULL"`
-	SubDeptName string `json:"sub_dept_name" type:"field" sql:"VARCHAR NOT NULL"`
-	MinMargin   string `json:"min_margin" type:"field" sql:"VARCHAR NOT NULL DEFAULT '0.15'"`
-	Label       string `json:"label"`
-	composite   string `name:"departments_pkey" type:"constraint" sql:"PRIMARY KEY(name, sub_dept_name)"`
+	table          string `name:"departments" type:"table"`
+	Code           int64  `json:"code" type:"field" sql:"SERIAL UNIQUE"`
+	Name           string `json:"name" type:"field" sql:"VARCHAR NOT NULL"`
+	SubDeptName    string `json:"sub_dept_name" type:"field" sql:"VARCHAR NOT NULL"`
+	MinMargin      string `json:"min_margin" type:"field" sql:"VARCHAR NOT NULL DEFAULT '0.15'"`
+	Label          string `json:"label"`
+	IsMenuCategory bool   `json:"is_menu_category" type:"field" sql:"bool NOT NULL DEFAULT true"`
+	composite      string `name:"departments_pkey" type:"constraint" sql:"PRIMARY KEY(name, sub_dept_name)"`
 }
 
 func createDeptTbl() error {
@@ -25,16 +26,24 @@ func createDeptTbl() error {
 	return database.CreateFromStruct(tblStruct)
 }
 
-func GetDepartments() ([]Departments, map[string]map[string]int64, error) {
+func GetDepartments(onlyMenu bool) ([]Departments, map[string]map[string]int64, error) {
 	var deps []Departments
 
-	sql := `SELECT 
+	cond := ""
+	if onlyMenu {
+		cond = `WHERE is_menu_category = true`
+	}
+	sql := fmt.Sprintf(`
+			SELECT 
 				code
 				, name
 				, sub_dept_name
 				, min_margin
+				, is_menu_category
 			FROM departments 
-			ORDER BY code ASC`
+			%v
+			ORDER BY code ASC`, cond)
+	fmt.Println("sql =", sql)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -48,7 +57,7 @@ func GetDepartments() ([]Departments, map[string]map[string]int64, error) {
 	cartegories := make(map[string]map[string]int64)
 	for rows.Next() {
 		var dep Departments
-		err = rows.Scan(&dep.Code, &dep.Name, &dep.SubDeptName, &dep.MinMargin)
+		err = rows.Scan(&dep.Code, &dep.Name, &dep.SubDeptName, &dep.MinMargin, &dep.IsMenuCategory)
 		if err != nil {
 			return deps, cartegories, err
 		}
@@ -96,17 +105,18 @@ func (arg *Departments) CreateNew() error {
 // Update updates a department
 // Updates the department in the database
 // returns an error if it fails
-func (arg *Departments) Update() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func (arg *Departments) Update(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	sql := `UPDATE departments
 			SET name = $1
 				, sub_dept_name = $2
 				, min_margin = $3
-			WHERE code = $4`
+				, is_menu_category = $4
+			WHERE code = $5`
 
-	_, err := database.PgPool.Query(ctx, sql, arg.Name, arg.SubDeptName, arg.MinMargin, arg.Code)
+	_, err := database.PgPool.Exec(ctx, sql, arg.Name, arg.SubDeptName, arg.MinMargin, arg.IsMenuCategory, arg.Code)
 	if err != nil {
 		log.Println("error. failed to update() department    err =", err)
 		return err

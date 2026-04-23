@@ -189,6 +189,34 @@ func (arg *ProdDB) LoadCodeTranslator() error {
 	return nil
 }
 
+func (arg *ProdDB) LoadVats() error {
+	sql := `
+		SELECT 
+			code, rate 
+		FROM vats 
+		GROUP BY code, rate`
+
+	rows, err := database.PgPool.Query(context.Background(), sql)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	vats := make(map[string]float64)
+	for rows.Next() {
+		code := ""
+		rate := float64(0)
+		err = rows.Scan(&code, &rate)
+		if err != nil {
+			return err
+		}
+		vats[code] = rate
+	}
+	arg.Vats = vats
+
+	return nil
+}
+
 // AddProduct adds a new product to Cache
 func (arg *ProdDB) AddProduct(val StockMaster) error {
 	start := time.Now()
@@ -342,6 +370,12 @@ func (arg *ProdDB) LoadFromDB() error {
 		return err
 	}
 	// fmt.Println("\t\t Loaded code translations")
+
+	err = arg.LoadVats()
+	if err != nil {
+		log.Println("error. failed to load VATs    err =", err)
+		return err
+	}
 
 	err = arg.Pickle()
 	if err != nil {

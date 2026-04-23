@@ -185,6 +185,27 @@ func GetByCode(key string, all bool, locID int64) (StockMaster, error) {
 	return arg, nil
 }
 
+// GetMultiCodes fetches products from a list of codes
+// receives a list of codes
+// returns a slice of StockMaster and error if fails
+func GetMultiCodes(keys []string) ([]StockMaster, error) {
+	vals := []StockMaster{}
+
+	if len(keys) == 0 {
+		return vals, nil
+	}
+
+	for _, val := range ProdMaster.ProductDB {
+		for _, code := range keys {
+			if val.ItemCode == code {
+				vals = append(vals, val)
+			}
+		}
+	}
+
+	return vals, nil
+}
+
 // SearchDescription fetches product by the item code
 // Queries data from cache
 // Receives a string that represents the item name in search

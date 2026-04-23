@@ -18,6 +18,8 @@ import (
 	"github.com/JohnnyKahiu/speedsales_inventory/database"
 	"github.com/JohnnyKahiu/speedsales_inventory/internal/broker"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/balances"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/branches"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/count"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/variables"
 	"github.com/joho/godotenv"
@@ -92,6 +94,14 @@ func initTables() error {
 
 	if err = balances.GenBalTable(); err != nil {
 		log.Println("create table error    err =", err)
+	}
+
+	if err = branches.GenBranchTbl(); err != nil {
+		log.Fatalln("error creating branch tables    err =", err)
+	}
+
+	if err = count.GenCountTbls(); err != nil {
+		log.Fatalln("error creating Count tables    err =", err)
 	}
 
 	return err

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/authentication"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
 	"github.com/gorilla/mux"
 )
@@ -195,13 +196,17 @@ func UpdateRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{}
 			return respMap
 		}
 
-		err = dept.Update()
+		err = dept.Update(r.Context())
 		if err != nil {
 			log.Println("error. failed to update department     err =", err)
 			respMap["response"] = "error"
 			respMap["message"] = "error updating department"
 			return respMap
 		}
+
+		// switch{
+		// 	case
+		// }
 
 		respMap["response"] = "success"
 		return respMap
@@ -261,9 +266,20 @@ func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	vars := mux.Vars(r)
 	key := vars["key"]
 
+	det_str := r.Header.Get("user_details")
+	details := authentication.User{}
+	json.Unmarshal([]byte(det_str), &details)
+
 	switch key {
 	case "departments":
-		vals, cartegories, err := products.GetDepartments()
+		isMenu := true
+
+		onlyMenu := r.URL.Query().Get("only_menu")
+		if onlyMenu == "false" {
+			isMenu = false
+		}
+
+		vals, cartegories, err := products.GetDepartments(isMenu)
 		if err != nil {
 			log.Println("error failed getting departments    err =", err)
 			respMap["response"] = "error"
@@ -288,6 +304,56 @@ func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		// }
 		respMap["response"] = "success"
 		respMap["values"] = "vals"
+		return respMap
+
+	case "bins":
+		// log.Fatalln("branch = ", details.Branch)
+		stkLoc := products.Locations{
+			StoreName: details.Branch,
+		}
+
+		vals, err := stkLoc.Fetch()
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "failed to get stk_locateions"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = vals
+		return respMap
+
+	case "bins_multi":
+		fmt.Println("fetching bins_multi")
+		key := r.URL.Query().Get("ids")
+		fmt.Println("keys =", key)
+
+		autoIDs := []int{}
+		err := json.Unmarshal([]byte(key), &autoIDs)
+		if err != nil {
+			log.Println("error failed to unmarshal ids    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to marshal json"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		fmt.Println("auto_ids =", autoIDs)
+		stkLoc := products.Locations{
+			IDS: autoIDs,
+		}
+
+		vals, err := stkLoc.FetchMultiIDs(r.Context())
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "failed to fetch items"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = vals
 		return respMap
 	}
 
