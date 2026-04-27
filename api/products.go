@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/JohnnyKahiu/speedsales_inventory/internal/products"
+	"github.com/JohnnyKahiu/speedsales_inventory/internal/product"
 )
 
 func PostProducts(w http.ResponseWriter, r *http.Request) {
-	respMap := products.PostRoutes(w, r)
+	respMap := product.PostRoutes(w, r)
 
 	EnableCors(&w)
 	jstr, err := json.Marshal(respMap)
@@ -30,7 +30,7 @@ func UpdateProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respMap := products.UpdateRoutes(w, r)
+	respMap := product.UpdateRoutes(w, r)
 
 	EnableCors(&w)
 	jstr, err := json.Marshal(respMap)
@@ -44,7 +44,7 @@ func UpdateProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func DelProducts(w http.ResponseWriter, r *http.Request) {
-	respMap := products.DelRoutes(w, r)
+	respMap := product.DelRoutes(w, r)
 
 	EnableCors(&w)
 	jstr, err := json.Marshal(respMap)
@@ -58,7 +58,7 @@ func DelProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func CatalogueGet(w http.ResponseWriter, r *http.Request) {
-	respMap := products.CatalogueGet(w, r)
+	respMap := product.CatalogueGet(w, r)
 
 	EnableCors(&w)
 	jstr, err := json.Marshal(respMap)
@@ -72,7 +72,7 @@ func CatalogueGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetGroups(w http.ResponseWriter, r *http.Request) {
-	respMap := products.GetGroups(w, r)
+	respMap := product.GetGroups(w, r)
 
 	EnableCors(&w)
 	jstr, err := json.Marshal(respMap)

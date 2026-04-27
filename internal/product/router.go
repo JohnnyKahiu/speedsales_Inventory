@@ -1,4 +1,4 @@
-package products
+package product
 
 import (
 	"context"
@@ -168,6 +168,7 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	return respMap
 }
 
+// UpdateRoutes handles PUT requests
 func UpdateRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	respMap := make(map[string]interface{})
 

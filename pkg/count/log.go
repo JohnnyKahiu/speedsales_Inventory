@@ -12,17 +12,19 @@ import (
 )
 
 type CountLog struct {
-	table     string    `name:"count_log" type:"table"`
-	TransDate time.Time `json:"trans_date" type:"field" sql:"TIMESTAMPTZ NOT NULL DEFAULT now()"`
-	CountID   int64     `json:"count_id" type:"field" sql:"BIGINT NOT NULL DEFAULT '0'"`
-	Branch    string    `json:"branch" type:"field" sql:"VARCHAR NOT NULL"`
-	CountType string    `json:"count_type" type:"field" sql:"VARCHAR NOT NULL"`
-	Bins      []int64   `json:"bins" type:"field" sql:"INT[]"`
-	Suppliers []string  `json:"suppliers" type:"field" sql:"VARCHAR[]"`
-	CountEnd  time.Time `json:"count_end" type:"field" sql:"TIMESTAMPTZ"`
-	Total     int       `json:"total" type:"field" sql:"INT NOT NULL DEFAULT '0'"`
-	Variance  int       `json:"variance" type:"field" sql:"INT NOT NULL DEFAULT '0'"`
-	Count     int64     `json:"count"`
+	table     string       `name:"count_log" type:"table"`
+	TransDate time.Time    `json:"trans_date" type:"field" sql:"TIMESTAMPTZ NOT NULL DEFAULT now()"`
+	CountID   int64        `json:"count_id" type:"field" sql:"BIGINT NOT NULL DEFAULT '0'"`
+	Branch    string       `json:"branch" type:"field" sql:"VARCHAR NOT NULL"`
+	CountType string       `json:"count_type" type:"field" sql:"VARCHAR NOT NULL"`
+	Bins      []int64      `json:"bins" type:"field" sql:"INT[]"`
+	Suppliers []string     `json:"suppliers" type:"field" sql:"VARCHAR[]"`
+	CountEnd  time.Time    `json:"count_end" type:"field" sql:"TIMESTAMPTZ"`
+	Total     int          `json:"total" type:"field" sql:"INT NOT NULL DEFAULT '0'"`
+	Variance  int          `json:"variance" type:"field" sql:"INT NOT NULL DEFAULT '0'"`
+	Items     []CountItems `json:"count_items"`
+	Count     int64        `json:"count"`
+	Bin       int64        `json"bin"`
 }
 
 func genCountLogTbl() error {
@@ -63,19 +65,61 @@ func (arg *CountLog) New(ctxt context.Context) error {
 	}
 	defer tx.Rollback(ctx)
 
+	// generate new count_id
 	err = arg.GenNewID(ctx, tx)
 	if err != nil {
 		return err
 	}
 
+	// Record into database
+	err = arg.RecordCount(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	// add items to count_items
+	err = arg.AddItems(ctx, tx)
+	if err != nil {
+		log.Println("error. failed to add items to count_log     err =", err)
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// RecordCount - inserts data into count_log table
+// returns an error if it fails
+func (arg *CountLog) RecordCount(ctx context.Context, tx pgx.Tx) error {
 	sql := `INSERT INTO count_log(branch, count_id, count_type, bins, suppliers)
 			VALUES($1, $2, $3, $4, $5)`
-	_, err = tx.Exec(ctx, sql, arg.Branch, arg.CountID, arg.CountType, arg.Bins, arg.Suppliers)
+
+	_, err := tx.Exec(ctx, sql, arg.Branch, arg.CountID, arg.CountType, arg.Bins, arg.Suppliers)
 	if err != nil {
 		log.Println("error. failed to create new count_log     err =", err)
 		return err
 	}
-	return tx.Commit(ctx)
+
+	return nil
+}
+
+// AddItems adds count_log items into count Items
+// returns an error if it fails
+func (arg *CountLog) AddItems(ctx context.Context, tx pgx.Tx) error {
+	sql := `INSERT INTO count_items(count_num, location_id, item_code, items_per_case)
+			SELECT 
+				cl.count_id, l.auto_id, m.item_code, m.units_per_pack::float
+			FROM stock_locations l 
+				INNER JOIN count_log cl ON l.auto_id = ANY (cl.bins)
+				LEFT JOIN stock_master m ON m.item_code = ANY (l.stock_list)
+			WHERE cl.count_id = $1
+			`
+
+	_, err := tx.Exec(ctx, sql, arg.CountID)
+	if err != nil {
+		log.Println("sql error. failed to add count_items    err =", err)
+		return err
+	}
+
+	return nil
 }
 
 // Active  fetches all active count_logs
@@ -115,4 +159,47 @@ func (arg *CountLog) Active(ctxt context.Context) ([]CountLog, error) {
 // FetchBins fetches all bin details
 func (arg *CountLog) FetchBins(ctxt context.Context) ([]CountLog, error) {
 	return nil, nil
+}
+
+// FetchItems - queries count items
+// database queries of count_items table by count_id
+// populates the data in count_log
+// returns an error if it fails
+func (arg *CountLog) FetchItems(ctxt context.Context) error {
+	binCon := `$2 = $2`
+	if arg.Bin != 0 {
+		binCon = `ci.location_id = $2`
+	}
+
+	sql := `
+		SELECT 
+			ci.auto_id, cl.count_id, ci.location_id, 
+			m.item_code, m.item_name, m.units_per_pack::float, m.dept_name, 
+			ci.counted, ci.system_bal
+		FROM count_items ci
+			INNER JOIN count_log cl ON ci.count_num = cl.count_id
+			LEFT JOIN stock_master m ON m.item_code = ci.item_code
+		WHERE cl.count_id = $1 AND ` + binCon
+	// fmt.Printf("%s \n vals(%v, %v)", sql, arg.CountID, arg.Bin)
+
+	ctx, cancel := context.WithTimeout(ctxt, 15*time.Second)
+	defer cancel()
+
+	rows, err := database.PgPool.Query(ctx, sql, arg.CountID, arg.Bin)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	arg.Items = []CountItems{}
+	for rows.Next() {
+		r := CountItems{}
+		rows.Scan(&r.AutoID, &r.CountNum, &r.LocationID,
+			&r.ItemCode, &r.ItemName, &r.ItemsPerCase, &r.DeptName,
+			&r.Counted, &r.SystemBal)
+
+		arg.Items = append(arg.Items, r)
+	}
+
+	return nil
 }

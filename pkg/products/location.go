@@ -190,6 +190,7 @@ func (arg *Locations) AddToStockList(cntxt context.Context) error {
 	return nil
 }
 
+// FetchMultiIDs
 func (arg *Locations) FetchMultiIDs(cntxt context.Context) ([]Locations, error) {
 	sql := `SELECT 
 				auto_id, store_num, 

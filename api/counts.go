@@ -8,7 +8,7 @@ import (
 )
 
 func PostCounts(w http.ResponseWriter, r *http.Request) {
-	respMap := counts.POST(w, r)
+	respMap := counts.POST(r)
 
 	EnableCors(&w)
 	jstr, err := json.Marshal(respMap)
