@@ -285,7 +285,6 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 
 	case "count_variance":
 		stkNum := r.URL.Query().Get("count_id")
-		fmt.Println("count_id =", stkNum)
 
 		countID, err := strconv.ParseInt(stkNum, 10, 64)
 		if err != nil {

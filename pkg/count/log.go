@@ -263,7 +263,6 @@ func (arg *CountLog) FetchCompeted(ctxt context.Context, start, end string) ([]C
 			AND count_end::date >= $1 
 			AND count_end::date <= $2`
 
-	fmt.Printf("%v, %v, %v, %v\n\n", sql, start, end)
 	ctx, cancel := context.WithTimeout(ctxt, 15*time.Second)
 	defer cancel()
 

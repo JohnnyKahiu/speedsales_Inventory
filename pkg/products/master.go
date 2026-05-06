@@ -17,7 +17,8 @@ import (
 // StockMaster Holds information about a stock item
 type StockMaster struct {
 	table              string            `type:"table" name:"stock_master"`
-	ItemCode           string            `json:"item_code" type:"field" sql:"VARCHAR PRIMARY KEY"`
+	SkuNum             string            `json:"sku_num" type:"field" sql:"SERIAL NOT NULL"`
+	ItemCode           string            `json:"item_code" type:"field" sql:"VARCHAR UNIQUE"`
 	ItemName           string            `json:"item_name" type:"field" sql:"VARCHAR NOT NULL"`
 	Description        Description       `json:"description"`
 	ItemCost           float64           `json:"item_cost" type:"field" sql:"DECIMAL NOT NULL DEFAULT '0.0'"`
@@ -56,6 +57,7 @@ type StockMaster struct {
 	Image              string            `json:"image" type:"field" sql:"VARCHAR"`
 	IsCombo            bool              `json:"is_combo" type:"field" sql:"BOOLEAN NOT NULL DEFAULT False"`
 	ComboItems         []Combo           `json:"combo_items" type:"field" sql:"JSONB"`
+	pkey               string            `type:"constraint" name:"master_key" sql:"PRIMARY KEY(sku_num)"`
 	Balance            map[int64]float64 `json:"balance"`
 	OnOffer            bool              `json:"on_offer"`
 	TillPrice          float64           `json:"till_price"`
@@ -141,18 +143,15 @@ func GetByCode(key string, all bool, locID int64) (StockMaster, error) {
 		return arg, fmt.Errorf("empty search key")
 	}
 
-	fmt.Println("\t key =", key)
 	// for key, _ := range ProdMaster.ProductDB {
 	// 	fmt.Println("\t", key)
 	// }
-	fmt.Printf("\n\t code trans = %v\n", ProdMaster.Codes)
 
 	// get master code from code translation
 	ct, ok := ProdMaster.Codes[key]
 	if !ok {
 		ct.MasterCode = key
 	}
-	fmt.Println("\t code translator =", ct.MasterCode)
 
 	// Get combo items
 	for i, itm := range ProdMaster.ProductDB[ct.MasterCode].ComboItems {
@@ -171,7 +170,6 @@ func GetByCode(key string, all bool, locID int64) (StockMaster, error) {
 	if arg.UnitsPerPack == 0 {
 		arg.UnitsPerPack = 1
 	}
-	fmt.Println("item =", arg)
 
 	arg.VatPercent = ProdMaster.Vats[arg.VatAlpha]
 	err := arg.StockCalcs()
@@ -252,7 +250,11 @@ func SearchByCategory(key string, locID int64) ([]StockMaster, error) {
 			if item.ItemCode == "" {
 				fmt.Println("\t null item")
 				continue
+
 			}
+
+			// fmt.Printf("item_code = %v \t balances = %v\n\n", item.ItemCode, item.Balance)
+
 			item.Bal = item.Balance[locID]
 			if locID == 0 {
 				item.Bal = float64(0)
@@ -338,7 +340,6 @@ func (val *StockMaster) StockCalcs() error {
 // Adds to database and cache
 // Returns an error if fails
 func (arg *StockMaster) CreateNew() error {
-	fmt.Println("Item Code = ", arg.ItemCode)
 	if arg.ItemCode == "" {
 		log.Println("failed to create new item. item code is required")
 		return errors.New("item code is required")

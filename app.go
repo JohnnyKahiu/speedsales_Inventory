@@ -97,16 +97,16 @@ func initTables() error {
 		log.Println("create table error    err =", err)
 	}
 
-	if err = balances.GenArchiveTbl(); err != nil {
-		log.Println("error creating archve tables     err =", err)
-	}
-
 	if err = branches.GenBranchTbl(); err != nil {
 		log.Fatalln("error creating branch tables    err =", err)
 	}
 
 	if err = count.GenCountTbls(); err != nil {
 		log.Fatalln("error creating Count tables    err =", err)
+	}
+
+	if err = balances.GenArchiveTbl(); err != nil {
+		log.Fatalln("error creating archve tables     err =", err)
 	}
 
 	return err

@@ -43,7 +43,6 @@ func GetDepartments(onlyMenu bool) ([]Departments, map[string]map[string]int64, 
 			FROM departments 
 			%v
 			ORDER BY code ASC`, cond)
-	fmt.Println("sql =", sql)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -70,7 +69,6 @@ func GetDepartments(onlyMenu bool) ([]Departments, map[string]map[string]int64, 
 		cartegories[dep.Name][dep.SubDeptName] = dep.Code
 	}
 
-	fmt.Println("\n\t cartegories = ", cartegories)
 	return deps, cartegories, nil
 }
 

@@ -21,7 +21,8 @@ type Balance struct {
 
 type TxnLog struct {
 	table       string    `name:"txn_log" type:"table"`
-	TransDate   time.Time `json:"trans_date" type:"field" name:"trans_date" sql:"TIMESTAMP NOT NULL DEFAULT NOW()"`
+	AutoID      int64     `json:"auto_id" type:"field" sql:"BIGSERIAL NOT NULL UNIQUE"`
+	TransDate   time.Time `json:"trans_date" type:"field" sql:"TIMESTAMPTZ NOT NULL DEFAULT NOW()"`
 	Description string    `json:"description" type:"field" sql:"VARCHAR NOT NULL DEFAULT ''"`
 	TxnID       string    `json:"txn_id" type:"field" sql:"VARCHAR NOT NULL"`
 	LocationID  int64     `json:"location_id" type:"field" sql:"BIGINT NOT NULL DEFAULT '0'"`
@@ -31,7 +32,8 @@ type TxnLog struct {
 	Qty         float64   `json:"quantity"`
 	Bal         float64   `json:"bal"`
 	Rcpt        string    `json:"receipt_item"`
-	Constraint  string    `name:"pk_txn_log" type:"constraint" sql:"PRIMARY KEY(description, txn_id)"`
+	Constraint  string    `name:"pk_txn_log" type:"constraint" sql:"PRIMARY KEY(description, txn_id, item_code)"`
+	UniqueConst string    `name:"unique_txn_log" type:"constraint" sql:"UNIQUE(auto_id)"`
 	ForeignLoc  string    `name:"fk_location_id" type:"constraint" sql:"FOREIGN KEY (location_id) REFERENCES stock_locations(auto_id)"`
 }
 
@@ -72,7 +74,8 @@ func (arg *Balance) GetBal() error {
 	return nil
 }
 
-// LogBal
+// LogBal - logs new stock transaction into database
+// Creates a new database txn and implements LogBalTx(ctx, tx)
 // returns an error if it fails
 func (arg *TxnLog) LogBal(ctx context.Context) error {
 	c, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -85,31 +88,59 @@ func (arg *TxnLog) LogBal(ctx context.Context) error {
 	}
 	defer tx.Rollback(c)
 
-	sql := `INSERT INTO txn_log(description, txn_id, location_id, item_code, qty_in, qty_out)
-			VALUES($1, $2, $3, $4, $5, $6) 
-			ON CONFLICT ON CONSTRAINT pk_txn_log 
-			DO UPDATE 
-			SET 
-				qty_in = excluded.qty_in
-				, qty_out = excluded.qty_out`
+	err = arg.LogBalTx(ctx, tx)
+	if err != nil {
+		return err
+	}
 
-	_, err = tx.Exec(c, sql, arg.Description, arg.TxnID, arg.LocationID, arg.ItemCode, arg.QtyIn, arg.QtyOut)
+	log.Println("transaction logged successfully")
+	return tx.Commit(c)
+}
+
+// LogBal - logs new stock transaction into database inside a transaction
+// receives a parent context and a pgx.Tx transaction
+// returns an error if it fails
+func (arg *TxnLog) LogBalTx(ctx context.Context, tx pgx.Tx) error {
+	c, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	sql := `INSERT INTO txn_log(description, txn_id, location_id, item_code, qty_in, qty_out, trans_date)
+			VALUES($1, $2, $3, $4, $5, $6, $7) 
+			ON CONFLICT ON CONSTRAINT pk_txn_log 
+			DO UPDATE SET 
+				qty_in = excluded.qty_in, qty_out = excluded.qty_out
+			RETURNING auto_id`
+
+	rows, err := tx.Query(c, sql, arg.Description, arg.TxnID, arg.LocationID, arg.ItemCode, arg.QtyIn, arg.QtyOut, arg.TransDate)
 	if err != nil {
 		log.Println("sql error. failed to insert into txn_log    err =", err)
 		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err = rows.Scan(&arg.AutoID)
+		if err != nil {
+			log.Println("scan error. failed to scan auto_id    err =", err)
+		}
 	}
 
 	sql = ` SELECT 
 				SUM(qty_in - qty_out) as bal 
 			FROM txn_log 
 			WHERE location_id = $1 AND item_code = $2`
-	if err = tx.QueryRow(c, sql, arg.LocationID, arg.ItemCode).Scan(&arg.Bal); err != nil {
+	row, err := tx.Query(c, sql, arg.LocationID, arg.ItemCode)
+	if err != nil {
 		log.Println("sql error, failed to fetch balance     err =", err)
 		return err
 	}
+	defer row.Close()
 
-	log.Println("transaction logged successfully")
-	return tx.Commit(c)
+	for row.Next() {
+		row.Scan(&arg.Bal)
+	}
+
+	return nil
 }
 
 // RemoveBal
@@ -148,6 +179,44 @@ func (arg *TxnLog) RemoveBal(ctx context.Context) error {
 
 	log.Println("transaction logged successfully")
 	return tx.Commit(c)
+}
+
+func (arg *TxnLog) ArchivePrev(ctx context.Context, tx pgx.Tx) error {
+	sql := `
+		INSERT INTO txn_archives(auto_id, trans_date, description, txn_id, location_id, item_code, qty_in, qty_out)
+		SELECT 
+			auto_id
+			, trans_date
+			, description
+			, txn_id
+			, location_id
+			, item_code
+			, qty_in
+			, qty_out 
+		FROM txn_Log 
+		WHERE item_code = $1 
+			AND trans_date < (SELECT trans_date FROM txn_log WHERE auto_id = $2 ) `
+
+	_, err := tx.Exec(ctx, sql, arg.ItemCode, arg.AutoID)
+	if err != nil {
+		log.Println("postgresql error.  failed to insert into archives     err =", err)
+		return err
+	}
+
+	return nil
+}
+
+// PurgePrev - removes all previous balances from current log to make it zero
+func (arg *TxnLog) PurgePrev(ctx context.Context, tx pgx.Tx) error {
+	// remove from txn_log
+	sql := `DELETE FROM txn_log WHERE trans_date < $1`
+	_, err := tx.Exec(ctx, sql, arg.TransDate)
+	if err != nil {
+		log.Println("postgresql error     delete from txn_log     err =", err)
+		return err
+	}
+
+	return nil
 }
 
 // SaveBal saves the balance to cache

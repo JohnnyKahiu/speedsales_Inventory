@@ -28,6 +28,9 @@ type ProdDB struct {
 
 var ProdMaster ProdDB
 
+// LoadStockMaster- loads stock_master to memory
+// queries data from stock_master and saves as bytes to ProdMaster
+// returns an error if fails
 func (arg *ProdDB) LoadStockMaster() error {
 	sql := `SELECT 
 				st_mas.item_code as item_code
@@ -58,7 +61,7 @@ func (arg *ProdDB) LoadStockMaster() error {
 				, coalesce(st_mas.image, '../../static/images/')
 				, st_mas.is_active
 				, st_mas.is_inventory
-				, coalesce(bal.balance::varchar, '{}')
+				, coalesce(bal.balance::varchar, '{}') as balances
 				, coalesce(d.product, '')
 				, coalesce(d.brand_name, '')
 				, coalesce(d.category, '')
@@ -73,7 +76,7 @@ func (arg *ProdDB) LoadStockMaster() error {
 				LEFT JOIN suppliers as supp ON supp.auto_id = st_mas.supplier_code
 				LEFT JOIN (SELECT 
 								item_code
-								, CONCAT('{',location_id, ': ', SUM(qty_in - qty_out), '}') as balance 
+								, CONCAT('{"',location_id, '": ', SUM(qty_in - qty_out), '}') as balance 
 							FROM txn_log GROUP BY item_code, location_id
 					) bal ON bal.item_code = st_mas.item_code
 			 `
@@ -100,7 +103,12 @@ func (arg *ProdDB) LoadStockMaster() error {
 		}
 		r.Label = r.ItemCode
 
-		json.Unmarshal([]byte(balanceMapStr), &r.Balance)
+		r.Balance = make(map[int64]float64)
+		err = json.Unmarshal([]byte(balanceMapStr), &r.Balance)
+		if err != nil {
+			log.Println("json error    failed to unmarshal balances    err =", err)
+			// return err
+		}
 
 		if r.ItemCode == "" {
 			continue
@@ -318,6 +326,17 @@ func (arg *ProdDB) FetchAll() ([]StockMaster, error) {
 		vals = append(vals, item)
 	}
 	return vals, nil
+}
+
+func (arg *ProdDB) CacheBal(itemCode string, locID int64, bal float64) error {
+	item := arg.ProductDB[itemCode]
+	itemBal := item.Balance
+
+	itemBal[locID] = bal
+	item.Balance = itemBal
+	arg.ProductDB[itemCode] = item
+
+	return arg.Pickle()
 }
 
 // DelLink function removes link between code and master code

@@ -69,6 +69,7 @@ func (b *Kafka) StartSalesConsumer(ctx context.Context) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  []string{b.Broker},
 		Topic:    b.Topic,
+		GroupID:  "sales-api-group",
 		MinBytes: 1,
 		MaxBytes: 10e6,
 	})
@@ -98,6 +99,11 @@ func (b *Kafka) StartSalesConsumer(ctx context.Context) {
 		err = order.ProcessOrder(ctx)
 		if err != nil {
 			log.Println("salesorder error    failed to process order    err =", err)
+		}
+
+		// Only commit AFTER you've successfully processed the message
+		if err := reader.CommitMessages(ctx, msg); err != nil {
+			log.Printf("commit error: %v", err)
 		}
 
 	}

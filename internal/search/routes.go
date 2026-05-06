@@ -122,8 +122,6 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 
 		// code := r.URL.Query().Get("code")
-		fmt.Println("searching dept items for code ", keys)
-
 		values := []products.StockMaster{}
 
 		if keys == "" {
@@ -140,6 +138,7 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			return respMap
 		}
 
+		fmt.Println("\n\n searching items by category")
 		for _, key := range strings.Split(keys, ",") {
 			vals, err := products.SearchByCategory(key, locID)
 			if err != nil {
@@ -204,7 +203,6 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		return respMap
 
 	case "bin-details":
-		fmt.Println("fetching bin-details")
 		loc_id := r.URL.Query().Get("id")
 		loc := products.Locations{}
 		loc.AutoID, _ = strconv.ParseInt(loc_id, 10, 64)

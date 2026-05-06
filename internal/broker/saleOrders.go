@@ -74,7 +74,9 @@ func (arg *SalesOrder) ProcessOrder(ctx context.Context) error {
 		prod, _ := products.GetByCode(itm.ItemCode, true, loc.AutoID)
 		if prod.IsCombo && (prod.ComboItems != nil && len(prod.ComboItems) > 0) {
 			for _, comboItm := range prod.ComboItems {
-				bal := balances.TxnLog{Description: "sales orders"}
+				bal := balances.TxnLog{
+					Description: "sales orders",
+					TransDate:   itm.TransDate}
 
 				bal.LocationID = loc.AutoID
 				bal.ItemCode = comboItm.ItemCode
@@ -110,6 +112,7 @@ func (arg *SalesOrder) ProcessOrder(ctx context.Context) error {
 		bal.ItemCode = itm.ItemCode
 		bal.QtyOut = itm.Quantity
 		bal.TxnID = itm.ReceiptItem
+		bal.TransDate = itm.TransDate
 
 		if itm.State == "DELETED" || itm.State == "VOIDED" {
 			if err := bal.RemoveBal(ctx); err != nil {

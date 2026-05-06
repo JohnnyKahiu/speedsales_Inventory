@@ -3,7 +3,6 @@ package product
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -24,6 +23,7 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	m := vars["module"]
 
 	switch m {
+	//POST:
 	case "new", "create_new":
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -32,16 +32,12 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			respMap["message"] = "failed to get params"
 			return respMap
 		}
-		fmt.Println("params = ", string(b))
 
 		var stmas products.StockMaster
 		err = json.Unmarshal(b, &stmas)
 		if err != nil {
 			log.Println("json unmarshalling error    err =", err)
 		}
-		fmt.Println("\t stk_mas = ", string(stmas.ItemCode))
-		fmt.Println("\t is_active = ", stmas.IsActive)
-		fmt.Println("\t description = ", stmas.Description)
 
 		err = stmas.CreateNew()
 		if err != nil {
@@ -53,7 +49,7 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 
 		return respMap
 
-	// /products/link_code
+	// POST:/products/link_code
 	// creates a new code_translator link to a product master_code
 	// expects a code_translator struct
 	// master_code
@@ -92,13 +88,13 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		return respMap
 
-	// /products/add_to_combo
+	// POST:/products/add_to_combo
 	// adds a product to a combo
 	// expects a combo struct
 	case "add_to_combo":
 		return respMap
 
-	// /products/vats
+	// POST:/products/vats
 	// adds a new VAT
 	// expects a map[string]float64
 	case "vats":
@@ -109,11 +105,11 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			respMap["message"] = "error getting params"
 			return respMap
 		}
-		fmt.Println("params = ", string(b))
 
 		v := make(map[string]float64)
 		err = json.Unmarshal([]byte(b), &v)
 		if err != nil {
+			log.Println("error unmarshaling json    err =", err)
 			respMap["response"] = "error"
 			respMap["message"] = "unable to marshal json"
 			respMap["trace"] = err
@@ -123,6 +119,7 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		// add a new_VAT
 		err = products.ProdMaster.NewVat(v)
 		if err != nil {
+			log.Println("error adding NewVat    err =", err)
 			respMap["response"] = "error"
 			respMap["message"] = "unable to create new_vat"
 			respMap["trace"] = err
@@ -132,7 +129,7 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		return respMap
 
-	// /products/department
+	// POST:/products/department
 	// creates a new department
 	// expects a department struct
 	case "department":
@@ -204,10 +201,6 @@ func UpdateRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{}
 			respMap["message"] = "error updating department"
 			return respMap
 		}
-
-		// switch{
-		// 	case
-		// }
 
 		respMap["response"] = "success"
 		return respMap
@@ -326,9 +319,7 @@ func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		return respMap
 
 	case "bins_multi":
-		fmt.Println("fetching bins_multi")
 		key := r.URL.Query().Get("ids")
-		fmt.Println("keys =", key)
 
 		autoIDs := []int{}
 		err := json.Unmarshal([]byte(key), &autoIDs)
@@ -340,7 +331,6 @@ func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			return respMap
 		}
 
-		fmt.Println("auto_ids =", autoIDs)
 		stkLoc := products.Locations{
 			IDS: autoIDs,
 		}
