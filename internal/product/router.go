@@ -23,7 +23,7 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	m := vars["module"]
 
 	switch m {
-	//POST:
+	//POST: /products/new  or POST:/products/create_new
 	case "new", "create_new":
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -88,13 +88,13 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		return respMap
 
-	// POST:/products/add_to_combo
+	// POST: /products/new  or POST:/products/create_new/products/add_to_combo
 	// adds a product to a combo
 	// expects a combo struct
 	case "add_to_combo":
 		return respMap
 
-	// POST:/products/vats
+	// POST: /products/new  or POST:/products/create_new/products/vats
 	// adds a new VAT
 	// expects a map[string]float64
 	case "vats":
@@ -129,7 +129,7 @@ func PostRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		return respMap
 
-	// POST:/products/department
+	// POST: /products/new  or POST:/products/create_new/products/department
 	// creates a new department
 	// expects a department struct
 	case "department":

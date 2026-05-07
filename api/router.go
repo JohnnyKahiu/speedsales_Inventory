@@ -46,6 +46,8 @@ func NewRouter() *mux.Router {
 	r.HandleFunc("/products/stock_take/{module}", PostCounts).Methods("POST", "OPTIONS")
 	r.HandleFunc("/products/stock_take/{module}", GetCounts).Methods("GET", "OPTIONS")
 
+	r.HandleFunc("/reports/trail/{code}", GetTrails).Methods("GET", "OPTIONS")
+
 	// r.HandleFunc("/sms", sms.Post).Methods("POST", "OPTIONS")
 
 	return r

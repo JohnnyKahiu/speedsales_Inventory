@@ -66,6 +66,37 @@ func (arg *Locations) GetLocID(ctx context.Context) error {
 	return nil
 }
 
+// GetLocID fetches stock location data
+// returns an error if it fails
+func (arg *Locations) GetAllLocInBranch(ctx context.Context) error {
+	sql := `SELECT 
+				auto_id
+				, store_num
+				, store_name
+				, storage_location
+			FROM stock_locations
+			WHERE store_name = $1 `
+
+	rows, err := database.PgPool.Query(ctx, sql, arg.StoreName)
+	if err != nil {
+		log.Println("sql error   failed to fetch stock_location")
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(&arg.AutoID, &arg.StoreNum, &arg.StoreName, &arg.StorageLoc)
+		if err != nil {
+			log.Println("scan error    failed to scan row    err =", err)
+			return err
+		}
+
+		arg.IDS = append(arg.IDS, int(arg.AutoID))
+	}
+
+	return nil
+}
+
 // GetSaleLoc fetches stock location data
 // following a hierarchy and stock availability to get where sale was deducted
 // returns an error if it fails
