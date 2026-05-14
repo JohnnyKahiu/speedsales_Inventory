@@ -21,6 +21,8 @@ import (
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/branches"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/count"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/purchases"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/suppliers"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/variables"
 	"github.com/joho/godotenv"
 )
@@ -90,23 +92,31 @@ func (arg *ConfigFile) readConfFile() error {
 func initTables() error {
 	var err error
 	if err = products.GenProductsTables(); err != nil {
-		log.Println("error creating products tbl     err = ", err)
+		log.Println("error. failed creating products tbl     err = ", err)
 	}
 
 	if err = balances.GenBalTable(); err != nil {
-		log.Println("create table error    err =", err)
+		log.Println("error. failed creating balance table    err =", err)
 	}
 
 	if err = branches.GenBranchTbl(); err != nil {
-		log.Fatalln("error creating branch tables    err =", err)
+		log.Fatalln("error. failed creating branch tables    err =", err)
 	}
 
 	if err = count.GenCountTbls(); err != nil {
-		log.Fatalln("error creating Count tables    err =", err)
+		log.Fatalln("error. failed creating Count tables    err =", err)
 	}
 
 	if err = balances.GenArchiveTbl(); err != nil {
-		log.Fatalln("error creating archve tables     err =", err)
+		log.Fatalln("error. failed creating archve tables     err =", err)
+	}
+
+	if err = suppliers.GenSupplierTBL(); err != nil {
+		log.Fatalln("error. failed creating supplier tables     err =", err)
+	}
+
+	if err = purchases.GenPurchaseTbl(); err != nil {
+		log.Fatalln("error. failed creating purchases tables     err =", err)
 	}
 
 	return err

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -46,6 +45,14 @@ func NewRouter() *mux.Router {
 	r.HandleFunc("/products/stock_take/{module}", PostCounts).Methods("POST", "OPTIONS")
 	r.HandleFunc("/products/stock_take/{module}", GetCounts).Methods("GET", "OPTIONS")
 
+	r.HandleFunc("/suppliers/{module}", PostSuppliers).Methods("POST", "OPTIONS")
+	r.HandleFunc("/suppliers/{module}", GetSuppliers).Methods("GET", "OPTIONS")
+	// r.HandleFunc("/products/stock_take/{module}", GetCounts).Methods("GET", "OPTIONS")
+
+	r.HandleFunc("/aquisition/purchase/{module}", PostPurchase).Methods("POST", "OPTIONS")
+	r.HandleFunc("/aquisition/purchase/{module}", GetPurchase).Methods("GET", "OPTIONS")
+	r.HandleFunc("/aquisition/purchase/{module}", DelPurchase).Methods("DELETE", "OPTIONS")
+
 	r.HandleFunc("/reports/trail/{code}", GetTrails).Methods("GET", "OPTIONS")
 
 	// r.HandleFunc("/sms", sms.Post).Methods("POST", "OPTIONS")
@@ -87,7 +94,7 @@ func JwtMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		r.Header.Set("", fmt.Sprintf("%v", loc.AutoID))
+		// r.Header.Set("", fmt.Sprintf("%v", loc.AutoID))
 		next.ServeHTTP(w, r)
 	})
 }
