@@ -208,6 +208,28 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["response"] = "success"
 		respMap["values"] = list
 		return respMap
+
+	case "receipt":
+		grnNum := r.URL.Query().Get("grn_num")
+		grnLog := purchases.GrnLog{}
+
+		grnLog.GrnNum, _ = strconv.ParseInt(grnNum, 10, 64)
+		fmt.Printf("\t receipt for grn %v\n", grnLog.GrnNum)
+
+		err := grnLog.GetReceipt(r.Context())
+		if err != nil {
+			log.Println("error. failed to get grn receipt    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to get receipt"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		fmt.Printf("\n\t grn =\n\t %v\n", grnLog.Items)
+		respMap["response"] = "success"
+		respMap["values"] = grnLog
+		return respMap
+
 	}
 
 	return respMap

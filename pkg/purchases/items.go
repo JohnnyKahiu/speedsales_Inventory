@@ -25,6 +25,7 @@ type GrnItem struct {
 	DozCharged     float64   `json:"doz_charged" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
 	PcsCharged     float64   `json:"pcs_charged" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
 	QtyCharged     float64   `json:"qty_charged" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
+	QtyReceived    float64   `json:"qty_received" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
 	ItemCost       float64   `json:"item_cost" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
 	OldCost        float64   `json:"old_cost" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
 	ItemPrice      float64   `json:"item_price" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
@@ -52,18 +53,6 @@ type GrnItem struct {
 	grnfkey        string    `name:"grn_foreign_key" type:"constraint" sql:"FOREIGN KEY (grn_num) REFERENCES grn_log(grn_num) "`
 	locationFkey   string    `name:"loc_foreign_key" type:"constraint" sql:"FOREIGN KEY (location_id) REFERENCES stock_locations(auto_id)"`
 	OverallTotal   float64   `json:"overall_total"`
-	OverallVat     float64   `json:"overall_vat"`
-	InitDate       time.Time `json:"init_date"`
-	InvDate        time.Time `json:"inv_date"`
-	RecvDate       time.Time `json:"recv_date"`
-	InvNum         string    `json:"inv_num"`
-	SuppName       string    `json:"supp_name"`
-	SuppPin        string    `json:"supp_pin"`
-	Branch         string    `json:"branch"`
-	QtyReceived    float64   `json:"qty_received"`
-	GrnVat         float64   `json:"grn_vat"`
-	GrnVatable     float64   `json:"grn_vatable"`
-	GrnExcempt     float64   `json:"grn_excempt"`
 	VatPercent     float64   `json:"vat_percent"`
 	Label          string    `json:"label"`
 	CostTolerance  float64
@@ -126,6 +115,10 @@ func (a *GrnItem) AddItem(ctxt context.Context) error {
 	}
 
 	if err := a.resolveProduct(ctxt); err != nil {
+		return err
+	}
+
+	if err := a.validateQty(ctxt); err != nil {
 		return err
 	}
 
@@ -239,6 +232,20 @@ func (arg *GrnItem) determineState(ctxt context.Context) error {
 	if !withinTolerance {
 		arg.State = "PRICE CHANGE"
 	}
+	return nil
+}
+
+// validate quantities
+func (arg *GrnItem) validateQty(ctxt context.Context) error {
+	if arg.InvType == "purchase_simplified" {
+		arg.NetQty = arg.QtyCharged
+	}
+
+	if arg.NetQty > arg.QtyCharged {
+		arg.DiscountType = "quantity"
+		arg.QtyDiscount = arg.NetQty - arg.QtyCharged
+	}
+
 	return nil
 }
 

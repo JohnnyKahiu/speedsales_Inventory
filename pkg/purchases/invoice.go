@@ -34,7 +34,7 @@ type GrnLog struct {
 	RecvDate       string    `json:"recv_date" type:"field" sql:"TIMESTAMPTZ"`
 	State          string    `json:"state" type:"field" sql:"VARCHAR NOT NULL DEFAULT 'pending'"`
 	pKey           string    `name:"grn_pkey" type:"constraint" sql:"PRIMARY KEY (grn_num)"`
-	Items          []GrnItem
+	Items          []GrnItem `json:"items"`
 }
 
 func GenPurchaseTbl() error {
@@ -110,6 +110,23 @@ func (arg *GrnLog) GetGrn(ctxt context.Context) error {
 		return err
 	}
 
+	return nil
+}
+
+// GetReceipt = fetches full receipt details from Grn
+// fetches data from grn_log and grn_items
+// populates struct and
+// returns an error if it fails
+func (arg *GrnLog) GetReceipt(ctxt context.Context) error {
+	if err := arg.Details(ctxt); err != nil {
+		log.Println("failed to fetch grn_log details    err =", err)
+		return err
+	}
+
+	if err := arg.GetItems(ctxt); err != nil {
+		log.Println("failed to fetch grn_items     err =", err)
+		return err
+	}
 	return nil
 }
 
@@ -255,7 +272,7 @@ func (arg *GrnLog) GetItems(ctxt context.Context) error {
 			auto_id, trans_date, grn_num, company_id, vat_type, 
 			scan_code, item_code, item_name, 
 			ctn_charged, doz_charged, pcs_charged, qty_charged, 
-			item_cost, old_cost, item_price, item_vat, vat, excempt, 
+			item_cost, old_cost, item_price, vat, vatable, excempt, 
 			vat_alpha, discount_type, discount, discount_val, qty_discount, 
 			total_amount, total_amount_inc, net_qty, net_amount, state	
 		FROM grn_items 
@@ -276,7 +293,7 @@ func (arg *GrnLog) GetItems(ctxt context.Context) error {
 		err = rows.Scan(&r.AutoID, &r.TransDate, &r.GrnNum, &r.CompanyID, &r.InvType,
 			&r.ScanCode, &r.ItemCode, &r.ItemName,
 			&r.CtnCharged, &r.DozCharged, &r.PcsCharged, &r.QtyCharged,
-			&r.ItemCost, &r.OldCost, &r.ItemPrice, &r.ItemVat, &r.Vat, &r.Excempt,
+			&r.ItemCost, &r.OldCost, &r.ItemPrice, &r.Vat, &r.Vatable, &r.Excempt,
 			&r.VatAlpha, &r.DiscountType, &r.Discount, &r.DiscountVal, &r.QtyDiscount,
 			&r.TotalAmount, &r.TotalAmountInc, &r.NetQty, &r.NetAmount, &r.State,
 		)
@@ -410,15 +427,20 @@ func (arg *GrnLog) completeWithCalcCost(ctx context.Context, tx pgx.Tx) error {
 	sql := `UPDATE grn_log g
 			SET
 				total_amount_inc = a.total
+				, total_vat = a.total_vat
+				, vatable = a.vatable
 			FROM 
 				(SELECT 
 					grn_num
 					, SUM(total_amount_inc) as total 
+					, SUM(vat) as total_vat
+					, SUM(vatable) as vatable
 				 FROM grn_items 
 				 WHERE grn_num = $1 AND state = 'COMPLETED' 
 				 GROUP BY grn_num
 				) as a
-			WHERE a.grn_num = g.grn_num AND inv_type in ('return', 'delivery', 'purchase_simple')`
+			WHERE a.grn_num = g.grn_num 
+				AND inv_type in ('return', 'delivery', 'purchase_simple')`
 
 	_, err := tx.Exec(ctx, sql, arg.GrnNum)
 	if err != nil {
