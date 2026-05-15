@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/authentication"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
@@ -174,7 +175,39 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["values"] = grnLog.Items
 		return respMap
 
-	case "":
+	case "grn_list":
+		start := r.URL.Query().Get("start")
+		end := r.URL.Query().Get("start")
+
+		query := purchases.QueryLog{
+			Start: start,
+			End:   end,
+			State: []string{"POSTED"},
+		}
+
+		t := time.Now()
+		fmt.Printf("start_date = %v\n end_date = %v\n", start, end)
+		if query.Start == "" || query.Start == "null" {
+			lw := t.AddDate(0, 0, -7)
+			query.Start = fmt.Sprintf("%d-%02d-%02d", lw.Year(), lw.Month(), lw.Day())
+		}
+
+		if query.End == "" || query.End == "null" {
+			query.End = fmt.Sprintf("%d-%02d-%02d", t.Year(), t.Month(), t.Day())
+		}
+
+		fmt.Println("query params =", query)
+
+		list, err := query.FetchGrnList(r.Context())
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "failed to query grn list"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = list
+		return respMap
 	}
 
 	return respMap
