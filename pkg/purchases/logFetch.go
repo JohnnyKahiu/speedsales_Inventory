@@ -34,6 +34,11 @@ func (arg *QueryLog) FetchGrnList(ctxt context.Context) ([]GrnLog, error) {
 		suppCon = fmt.Sprintf("AND supp_name ILIKE '%v'", suppName)
 	}
 
+	timeCond := "AND trans_date::date >= $2 AND trans_date::date <= $3"
+	if arg.Start == "-1" || arg.End == "-1" {
+		timeCond = "AND $2 = $2 AND $3 = $3"
+	}
+
 	sql := fmt.Sprintf(`
 		SELECT 
 			trans_date, grn_num, supp_name, inv_num, supp_pin
@@ -42,10 +47,10 @@ func (arg *QueryLog) FetchGrnList(ctxt context.Context) ([]GrnLog, error) {
 			, inv_date, recv_date, state
 		FROM grn_log 
 		WHERE state = ANY($1) 
-			AND trans_date::date >= $2 AND trans_date::date <= $3 
+			%v
 			%v 
 			%v
-	`, posterCon, suppCon)
+	`, timeCond, posterCon, suppCon)
 
 	ctx, cancel := context.WithTimeout(ctxt, 20*time.Second)
 	defer cancel()

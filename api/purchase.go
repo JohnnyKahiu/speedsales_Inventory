@@ -32,6 +32,9 @@ func GetPurchase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+	if respMap["response"] == "error" {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 	w.Write(jstr)
 }
 
