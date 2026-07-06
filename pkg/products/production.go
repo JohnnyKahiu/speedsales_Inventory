@@ -105,29 +105,23 @@ func (arg Recipe) DBFetch() ([]Recipe, error) {
 	return vals, nil
 }
 
-// delRecipe function deletes an existing item from recipe
-func delRecipe(prodCode, itemCode string) error {
+// RemoveRecipeItem removes an ingredient from a recipe in memory and the database.
+func RemoveRecipeItem(prodCode, itemCode string) error {
 	var correct []Recipe
 	for _, item := range ProdMaster.Recipe[prodCode] {
 		if item.ItemCode != itemCode {
 			correct = append(correct, item)
 		}
 	}
-
 	ProdMaster.Recipe[prodCode] = correct
-	return nil
-}
 
-// delRecipeDB function deletes an existing item from recipe
-func delRecipeDB(prodCode, itemCode string) error {
-	sql := `DELETE FROM recipe WHERE prod_code = $1 AND item_code = $2`
-
-	_, err := database.PgPool.Exec(context.Background(), sql, prodCode, itemCode)
+	_, err := database.PgPool.Exec(context.Background(),
+		`DELETE FROM recipe WHERE prod_code = $1 AND item_code = $2`, prodCode, itemCode)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return ProdMaster.Pickle()
 }
 
 // adjustCostFromRecipe function calculates new item cost from recipe items

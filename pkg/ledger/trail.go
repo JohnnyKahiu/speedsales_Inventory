@@ -63,6 +63,8 @@ func (arg *Trail) FetchTrail(ctx context.Context) ([]Trail, error) {
 		if r.Description == "adopted stock count" {
 			r.OpenBal = r.In
 			cTotal = r.OpenBal
+
+			r.In = 0
 		}
 
 		cTotal += (r.In - r.Out)

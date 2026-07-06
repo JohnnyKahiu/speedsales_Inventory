@@ -125,7 +125,7 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		values := []products.StockMaster{}
 
 		if keys == "" {
-			values, err := products.All(100)
+			values, err := products.All(100, locID)
 			if err != nil {
 				respMap["response"] = "error"
 				respMap["message"] = "failed to fetch categories"
@@ -164,8 +164,18 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			l = "100"
 		}
 
+		// GetLoc
+		loc := r.Header.Get("location_id")
+		locID := int64(0)
+		if loc != "" {
+			locID, err = strconv.ParseInt(loc, 10, 64)
+			if err != nil {
+				locID = 0
+			}
+		}
+
 		limit, _ := strconv.ParseInt(l, 10, 0)
-		vals, err := products.All(int(limit))
+		vals, err := products.All(int(limit), locID)
 		if err != nil {
 			respMap["response"] = "error"
 			respMap["message"] = "failed to fetch categories"
@@ -187,6 +197,26 @@ func GetRoutes(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		if err != nil {
 			respMap["response"] = "error"
 			respMap["values"] = "failed to get all links"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = vals
+		return respMap
+
+	case "recipe":
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			respMap["response"] = "error"
+			respMap["message"] = "key (prod_code) is required"
+			return respMap
+		}
+
+		vals, err := products.FetchRecipeItems(key)
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "failed to fetch recipe"
 			respMap["trace"] = err
 			return respMap
 		}

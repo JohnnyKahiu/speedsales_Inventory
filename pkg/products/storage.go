@@ -304,22 +304,22 @@ func (arg *ProdDB) BulkUpdateLinks(cts []CodeTranslator) error {
 		return nil
 	}
 
+	arg.mx.Lock()
 	for _, ct := range cts {
 		if arg.Codes == nil {
 			arg.Codes = make(map[string]CodeTranslator)
 		}
 		arg.Codes[ct.LinkCode] = ct
-
-		err := arg.Pickle()
-		if err != nil {
-			log.Println("error. UpdateLinks failed to pickle    err =", err)
-			return err
-		}
 	}
-	return nil
+
+	arg.mx.Unlock()
+	return arg.Pickle()
 }
 
 func (arg *ProdDB) FetchAll() ([]StockMaster, error) {
+	arg.mx.RLock()
+	defer arg.mx.RUnlock()
+
 	var vals []StockMaster
 
 	for _, item := range arg.ProductDB {
@@ -329,6 +329,9 @@ func (arg *ProdDB) FetchAll() ([]StockMaster, error) {
 }
 
 func (arg *ProdDB) CacheBal(itemCode string, locID int64, bal float64) error {
+	arg.mx.Lock()
+	defer arg.mx.Unlock()
+
 	item := arg.ProductDB[itemCode]
 	itemBal := item.Balance
 

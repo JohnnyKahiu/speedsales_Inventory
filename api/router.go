@@ -21,41 +21,43 @@ func EnableCors(w *http.ResponseWriter) {
 }
 
 func NewRouter() *mux.Router {
-	// rentals.CreateTables()
-
 	r := mux.NewRouter()
 
-	// r.HandleFunc("/ws", socketHandler)
-	r.Use(JwtMiddleware)
+	// Public: image serving bypasses JWT.
+	r.HandleFunc("/products/image/{item_code}", GetItemImage).Methods("GET", "OPTIONS")
 
-	r.HandleFunc("/app/{module}", AppGet).Methods("GET", "OPTIONS")
+	// All other routes require a valid JWT token.
+	p := r.NewRoute().Subrouter()
+	p.Use(JwtMiddleware)
 
-	r.HandleFunc("/products/search/{module}", SearchGet).Methods("GET", "OPTIONS")
-	r.HandleFunc("/products/balance/{module}", BalanceGet).Methods("GET", "OPTIONS")
-	r.HandleFunc("/products/catalogue/{supplier}", CatalogueGet).Methods("GET", "OPTIONS")
-	r.HandleFunc("/products/groups/{key}", GetGroups).Methods("GET", "OPTIONS")
+	p.HandleFunc("/app/{module}", AppGet).Methods("GET", "OPTIONS")
 
-	r.HandleFunc("/products/{module}", PostProducts).Methods("POST", "OPTIONS")
-	r.HandleFunc("/products/update/{module}", UpdateProducts).Methods("POST", "OPTIONS")
+	p.HandleFunc("/products/search/{module}", SearchGet).Methods("GET", "OPTIONS")
+	p.HandleFunc("/products/balance/{module}", BalanceGet).Methods("GET", "OPTIONS")
+	p.HandleFunc("/products/catalogue/{supplier}", CatalogueGet).Methods("GET", "OPTIONS")
+	p.HandleFunc("/products/groups/{key}", GetGroups).Methods("GET", "OPTIONS")
 
-	r.HandleFunc("/products/locations/{module}", locationsPost).Methods("POST", "OPTIONS")
+	p.HandleFunc("/products/image/{item_code}", PostItemImage).Methods("POST", "OPTIONS")
 
-	r.HandleFunc("/products/{module}/{code}", DelProducts).Methods("DELETE", "OPTIONS")
+	p.HandleFunc("/products/{module}", PostProducts).Methods("POST", "OPTIONS")
+	p.HandleFunc("/products/update/{module}", UpdateProducts).Methods("POST", "OPTIONS")
 
-	r.HandleFunc("/products/stock_take/{module}", PostCounts).Methods("POST", "OPTIONS")
-	r.HandleFunc("/products/stock_take/{module}", GetCounts).Methods("GET", "OPTIONS")
+	p.HandleFunc("/products/locations/{module}", locationsPost).Methods("POST", "OPTIONS")
+	p.HandleFunc("/products/locations/{module}", locationsGet).Methods("GET", "OPTIONS")
 
-	r.HandleFunc("/suppliers/{module}", PostSuppliers).Methods("POST", "OPTIONS")
-	r.HandleFunc("/suppliers/{module}", GetSuppliers).Methods("GET", "OPTIONS")
-	// r.HandleFunc("/products/stock_take/{module}", GetCounts).Methods("GET", "OPTIONS")
+	p.HandleFunc("/products/{module}/{code}", DelProducts).Methods("DELETE", "OPTIONS")
 
-	r.HandleFunc("/aquisition/purchase/{module}", PostPurchase).Methods("POST", "OPTIONS")
-	r.HandleFunc("/aquisition/purchase/{module}", GetPurchase).Methods("GET", "OPTIONS")
-	r.HandleFunc("/aquisition/purchase/{module}", DelPurchase).Methods("DELETE", "OPTIONS")
+	p.HandleFunc("/products/stock_take/{module}", PostCounts).Methods("POST", "OPTIONS")
+	p.HandleFunc("/products/stock_take/{module}", GetCounts).Methods("GET", "OPTIONS")
 
-	r.HandleFunc("/reports/trail/{code}", GetTrails).Methods("GET", "OPTIONS")
+	p.HandleFunc("/suppliers/{module}", PostSuppliers).Methods("POST", "OPTIONS")
+	p.HandleFunc("/suppliers/{module}", GetSuppliers).Methods("GET", "OPTIONS")
 
-	// r.HandleFunc("/sms", sms.Post).Methods("POST", "OPTIONS")
+	p.HandleFunc("/aquisition/purchase/{module}", PostPurchase).Methods("POST", "OPTIONS")
+	p.HandleFunc("/aquisition/purchase/{module}", GetPurchase).Methods("GET", "OPTIONS")
+	p.HandleFunc("/aquisition/purchase/{module}", DelPurchase).Methods("DELETE", "OPTIONS")
+
+	p.HandleFunc("/reports/trail/{code}", GetTrails).Methods("GET", "OPTIONS")
 
 	return r
 }

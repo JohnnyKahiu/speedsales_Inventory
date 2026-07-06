@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/authentication"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/products"
 	"github.com/gorilla/mux"
 )
@@ -80,6 +81,38 @@ func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 
 		respMap["response"] = "success"
+		return respMap
+	}
+
+	return respMap
+}
+
+func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
+	respMap := make(map[string]interface{})
+
+	vars := mux.Vars(r)
+	m := vars["module"]
+
+	switch m {
+	case "list":
+		details := authentication.User{}
+		if err := json.Unmarshal([]byte(r.Header.Get("user_details")), &details); err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "user error"
+			return respMap
+		}
+
+		loc := products.Locations{StoreName: details.Branch}
+		vals, err := loc.Fetch()
+		if err != nil {
+			log.Println("failed to fetch locations    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to fetch locations"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = vals
 		return respMap
 	}
 

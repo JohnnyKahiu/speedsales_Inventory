@@ -15,6 +15,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// POST handles POST method routes
+// returns a map[string]interface{}
 func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	respMap := make(map[string]interface{})
 
@@ -38,7 +40,7 @@ func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 		fmt.Printf("new grn params = %s\n", b)
 
-		grn := purchases.GrnLog{RegisteredBy: details.Username}
+		grn := purchases.GrnLog{RegisteredBy: details.Username, TransDate: time.Now()}
 		err = json.Unmarshal(b, &grn)
 		if err != nil {
 			respMap["response"] = "error"
@@ -54,7 +56,9 @@ func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			respMap["message"] = "failed to generate GRN Num"
 			return respMap
 		}
+
 		respMap["response"] = "success"
+		respMap["grn_num"] = grn.GrnNum
 		return respMap
 
 	case "add-item":
@@ -118,12 +122,12 @@ func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 
 		grnLog.Poster = details.Username
 
-		err = grnLog.Complete(r.Context())
-		if err != nil {
+		if err := grnLog.Complete(r.Context()); err != nil {
 			log.Println("failed to complete posting     err =", err)
 			respMap["response"] = "error"
 			respMap["message"] = "failed to complete grn"
 			respMap["trace"] = err
+			return respMap
 		}
 
 		respMap["response"] = "success"
@@ -132,6 +136,8 @@ func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	return respMap
 }
 
+// GET handles GET routes
+// returns a map[string]interface{}
 func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 	respMap := make(map[string]interface{})
 
@@ -175,6 +181,40 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["values"] = grnLog.Items
 		return respMap
 
+	case "all":
+		start := r.URL.Query().Get("start")
+		end := r.URL.Query().Get("start")
+
+		query := purchases.QueryLog{
+			Start: start,
+			End:   end,
+			State: []string{"POSTED", "pending", "PRICE CHANGE", "COMPLETED"},
+		}
+
+		t := time.Now()
+		fmt.Printf("start_date = %v\n end_date = %v\n", start, end)
+		if query.Start == "" || query.Start == "null" {
+			lw := t.AddDate(0, 0, -7)
+			query.Start = fmt.Sprintf("%d-%02d-%02d", lw.Year(), lw.Month(), lw.Day())
+		}
+
+		if query.End == "" || query.End == "null" {
+			query.End = fmt.Sprintf("%d-%02d-%02d", t.Year(), t.Month(), t.Day())
+		}
+
+		fmt.Println("query params =", query)
+
+		list, err := query.FetchGrnList(r.Context())
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "failed to query grn list"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = list
+		return respMap
+
 	case "grn_list":
 		start := r.URL.Query().Get("start")
 		end := r.URL.Query().Get("start")
@@ -210,10 +250,11 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		return respMap
 
 	case "pc_list":
+		fmt.Println("Price change List   \n\n")
 		query := purchases.QueryLog{
 			Start: "-1",
 			End:   "-1",
-			State: []string{"PRICE CHANGE"},
+			State: []string{"pending_pc"},
 		}
 
 		t := time.Now()
@@ -260,6 +301,36 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["values"] = grnLog
 		return respMap
 
+	case "grn":
+		grnNum := r.URL.Query().Get("grn_num")
+		grnLog := purchases.GrnLog{}
+
+		grnLog.GrnNum, _ = strconv.ParseInt(grnNum, 10, 64)
+
+		fmt.Printf("\t receipt for grn %v\n", grnLog.GrnNum)
+
+		err := grnLog.Details(r.Context())
+		if err != nil {
+			log.Println("error. failed to get grn receipt    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to get receipt"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		err = grnLog.GetItems(r.Context())
+		if err != nil {
+			log.Println("error. failed to get grn_items    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to get receipt"
+			respMap["trace"] = err
+			return respMap
+		}
+
+		fmt.Printf("\n\t grn =\n\t %v\n", grnLog.Items)
+		respMap["response"] = "success"
+		respMap["values"] = grnLog
+		return respMap
 	}
 
 	return respMap

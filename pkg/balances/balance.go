@@ -140,7 +140,7 @@ func (arg *TxnLog) LogBalTx(ctx context.Context, tx pgx.Tx) error {
 		row.Scan(&arg.Bal)
 	}
 
-	return nil
+	return arg.SaveBal(ctx)
 }
 
 // RemoveBal

@@ -17,6 +17,7 @@ type QueryLog struct {
 	Poster   string   `json:"poster"`
 	Supplier string   `json:"supplier"`
 	State    []string `json:"state"`
+	Limit    int      `json:"limit"`
 }
 
 // FetchGrnList - gets all grn logs within a given range
@@ -39,6 +40,10 @@ func (arg *QueryLog) FetchGrnList(ctxt context.Context) ([]GrnLog, error) {
 		timeCond = "AND $2 = $2 AND $3 = $3"
 	}
 
+	if arg.Limit == 0 {
+		arg.Limit = 100
+	}
+
 	sql := fmt.Sprintf(`
 		SELECT 
 			trans_date, grn_num, supp_name, inv_num, supp_pin
@@ -50,12 +55,15 @@ func (arg *QueryLog) FetchGrnList(ctxt context.Context) ([]GrnLog, error) {
 			%v
 			%v 
 			%v
+		LIMIT $4
 	`, timeCond, posterCon, suppCon)
+
+	fmt.Println(sql)
 
 	ctx, cancel := context.WithTimeout(ctxt, 20*time.Second)
 	defer cancel()
 
-	rows, err := database.PgPool.Query(ctx, sql, arg.State, arg.Start, arg.End)
+	rows, err := database.PgPool.Query(ctx, sql, arg.State, arg.Start, arg.End, arg.Limit)
 	if err != nil {
 		log.Println("postgresql error.   failed to query grn_log details     err =", err)
 		return []GrnLog{}, err

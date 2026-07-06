@@ -18,3 +18,15 @@ func locationsPost(w http.ResponseWriter, r *http.Request) {
 
 	w.Write(jstr)
 }
+
+func locationsGet(w http.ResponseWriter, r *http.Request) {
+	respMap := locations.GET(w, r)
+
+	EnableCors(&w)
+	jstr, err := json.Marshal(respMap)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	w.Write(jstr)
+}

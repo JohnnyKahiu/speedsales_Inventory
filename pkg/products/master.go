@@ -193,11 +193,9 @@ func GetMultiCodes(keys []string) ([]StockMaster, error) {
 		return vals, nil
 	}
 
-	for _, val := range ProdMaster.ProductDB {
-		for _, code := range keys {
-			if val.ItemCode == code {
-				vals = append(vals, val)
-			}
+	for _, code := range keys {
+		if v, ok := ProdMaster.ProductDB[code]; ok {
+			vals = append(vals, v)
 		}
 	}
 
@@ -277,14 +275,26 @@ func SearchByCategory(key string, locID int64) ([]StockMaster, error) {
 // All fetches all products in a given limit
 // Receives a string param representing category_code
 // Returns a slice of products or an error
-func All(limit int) ([]StockMaster, error) {
+func All(limit int, locID int64) ([]StockMaster, error) {
 	var vals []StockMaster
 
 	i := 0
+
+	ProdMaster.mx.RLock()
+	defer ProdMaster.mx.RUnlock()
+
 	for _, item := range ProdMaster.ProductDB {
 
 		item.StockCalcs()
 		vals = append(vals, item)
+
+		item.Bal = item.Balance[locID]
+		if locID == 0 {
+			item.Bal = float64(0)
+			for _, val := range item.Balance {
+				item.Bal += val
+			}
+		}
 
 		if i >= limit && limit > 0 {
 			sort.Slice(vals, func(i, j int) bool { return vals[i].ItemName < vals[j].ItemName })

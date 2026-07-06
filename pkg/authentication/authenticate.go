@@ -42,6 +42,7 @@ type User struct {
 	CreateStock        bool      `json:"create_stock" name:"create_stock" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`
 	LinkStock          bool      `json:"link_stock" name:"link_stock" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`
 	CompleteStockTake  bool      `json:"complete_stock_take" name:"complete_stock_take" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`
+	AuditStock         bool      `json:"audit_stock" type:"field"`
 	Produce            bool      `json:"produce" name:"produce" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`
 	TillOpened         time.Time `json:"till_opened" name:"till_opened" type:"field" sql:"TIMESTAMP "`
 	Till               bool      `json:"till" name:"till" type:"field" sql:"BOOL NOT NULL DEFAULT 'FALSE'"`

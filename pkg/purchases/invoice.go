@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/JohnnyKahiu/speedsales_inventory/database"
+	"github.com/JohnnyKahiu/speedsales_inventory/pkg/balances"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -35,6 +36,7 @@ type GrnLog struct {
 	State          string    `json:"state" type:"field" sql:"VARCHAR NOT NULL DEFAULT 'pending'"`
 	pKey           string    `name:"grn_pkey" type:"constraint" sql:"PRIMARY KEY (grn_num)"`
 	Items          []GrnItem `json:"items"`
+	Branch         string    `json:"branch"`
 }
 
 func GenPurchaseTbl() error {
@@ -274,7 +276,7 @@ func (arg *GrnLog) GetItems(ctxt context.Context) error {
 			ctn_charged, doz_charged, pcs_charged, qty_charged, 
 			item_cost, old_cost, item_price, vat, vatable, excempt, 
 			vat_alpha, discount_type, discount, discount_val, qty_discount, 
-			total_amount, total_amount_inc, net_qty, net_amount, state	
+			total_amount, total_amount_inc, net_qty, net_amount, state, location_id
 		FROM grn_items 
 		WHERE grn_num = $1`
 
@@ -295,7 +297,7 @@ func (arg *GrnLog) GetItems(ctxt context.Context) error {
 			&r.CtnCharged, &r.DozCharged, &r.PcsCharged, &r.QtyCharged,
 			&r.ItemCost, &r.OldCost, &r.ItemPrice, &r.Vat, &r.Vatable, &r.Excempt,
 			&r.VatAlpha, &r.DiscountType, &r.Discount, &r.DiscountVal, &r.QtyDiscount,
-			&r.TotalAmount, &r.TotalAmountInc, &r.NetQty, &r.NetAmount, &r.State,
+			&r.TotalAmount, &r.TotalAmountInc, &r.NetQty, &r.NetAmount, &r.State, &r.LocationID,
 		)
 		if err != nil {
 			return err
@@ -487,6 +489,41 @@ func (arg *GrnLog) Complete(ctxt context.Context) error {
 
 	if err := arg.completeWithCalcCost(ctx, tx); err != nil {
 		return err
+	}
+
+	if err := arg.GetItems(ctx); err != nil {
+		return err
+	}
+
+	// arg.RecvDate has already been populated by Details() via a DB scan of the
+	// TIMESTAMPTZ column, so it arrives as Postgres's timestamptz text format
+	// (e.g. "2026-06-12 00:00:00+00"), not the "2006-01-02" form used in GetGrn.
+	recvDate, err := time.Parse("2006-01-02 15:04:05-07", arg.RecvDate)
+	if err != nil {
+		return fmt.Errorf("invalid recv_date %q: %w", arg.RecvDate, err)
+	}
+
+	for _, itm := range arg.Items {
+		if itm.State == "DELETED" {
+			continue
+		}
+
+		// add to stock transactions
+		bal := balances.TxnLog{
+			TransDate:   recvDate,
+			TxnID:       fmt.Sprintf("%v-%v", arg.GrnNum, itm.AutoID),
+			Description: "purchases",
+			LocationID:  itm.LocationID,
+			ItemCode:    itm.ItemCode,
+			QtyIn:       itm.NetQty,
+		}
+
+		if err := bal.LogBalTx(ctx, tx); err != nil {
+			log.Println("error. failed to log transaction balance     err =", err)
+			return err
+		}
+
+		fmt.Printf("\t added txn_log  item = %v \t location = %v\n", itm.ItemCode, itm.LocationID)
 	}
 
 	return tx.Commit(ctx)
