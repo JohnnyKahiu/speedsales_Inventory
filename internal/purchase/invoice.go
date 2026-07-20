@@ -62,17 +62,21 @@ func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		return respMap
 
 	case "add-item":
-		item := purchases.GrnItem{}
+		var req struct {
+			purchases.GrnItem
+			Branch string `json:"branch"`
+		}
 
-		if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			respMap["response"] = "error"
 			respMap["message"] = "params error"
 			respMap["trace"] = err
 			return respMap
 		}
+		item := req.GrnItem
 
 		loc := products.Locations{
-			StoreName:  details.Branch,
+			StoreName:  details.ResolveBranch(req.Branch),
 			StorageLoc: details.StkLocation,
 			ItemCode:   item.ItemCode,
 		}

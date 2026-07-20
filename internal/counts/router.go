@@ -99,6 +99,7 @@ func POST(r *http.Request) map[string]interface{} {
 
 		ci.SystemBal = prod.Bal
 		ci.Counted = (ci.Cases * float64(prod.UnitsPerPack)) + ci.Pieces
+		ci.AppendTrail(details.Username)
 
 		fmt.Printf("\t counted = %v \n\t cases = %v \n\t items_per_case = %v\n", ci.Counted, ci.Cases, ci.ItemsPerCase)
 		if err = ci.Count(r.Context()); err != nil {
@@ -269,7 +270,7 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		}
 		fmt.Printf("start_date = %v end_date = %v", start, end)
 
-		cl := count.CountLog{Branch: details.Branch}
+		cl := count.CountLog{Branch: details.ResolveBranch(r.URL.Query().Get("branch"))}
 
 		vals, err := cl.FetchCompeted(r.Context(), start, end)
 		if err != nil {

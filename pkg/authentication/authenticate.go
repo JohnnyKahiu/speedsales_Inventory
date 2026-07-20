@@ -56,6 +56,22 @@ type User struct {
 
 var mySigningKey = os.Getenv("JWT_KEY")
 
+// ResolveBranch returns the branch a request should operate against. A user
+// tied to one fixed branch always uses it, regardless of what the client
+// sends — a branch override from the request is only honored for a
+// branch-less/"all" user (one the frontend forces to pick an operating
+// branch via a blocking modal), otherwise a fixed-branch user could simply
+// set "branch" in a request to act on another branch's stock.
+func (u User) ResolveBranch(requested string) string {
+	if u.Branch != "" && u.Branch != "all" {
+		return u.Branch
+	}
+	if requested != "" {
+		return requested
+	}
+	return "Main"
+}
+
 func ValidateJWT(tokenStr string) (User, bool) {
 	address := os.Getenv("LOGIN_RPC_ADDR")
 	loginSvc, err := grpc.NewLoginService(address)

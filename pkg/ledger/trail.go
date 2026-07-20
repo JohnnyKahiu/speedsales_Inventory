@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -24,11 +23,20 @@ type Trail struct {
 }
 
 func (arg *Trail) FetchTrail(ctx context.Context) ([]Trail, error) {
-	fmt.Println("location_ids =", arg.LocationIDs)
-	if len(arg.LocationIDs) <= 0 || arg.LocationIDs == nil {
-		arg.LocationIDs = []int{}
+	// Compute opening balance from all transactions before the start date.
+	var openingBal float64
+	err := database.PgPool.QueryRow(ctx,
+		`SELECT coalesce(SUM(qty_in - qty_out), 0)
+		 FROM txn_log l
+		 INNER JOIN stock_master m ON m.item_code = l.item_code
+		 WHERE l.item_code = $1 AND l.trans_date::date < $2`,
+		arg.ItemCode, arg.Start,
+	).Scan(&openingBal)
+	if err != nil {
+		return []Trail{}, err
 	}
-	sql := `SELECT 
+
+	sql := `SELECT
 				l.trans_date
 				, l.description
 				, l.item_code
@@ -36,21 +44,18 @@ func (arg *Trail) FetchTrail(ctx context.Context) ([]Trail, error) {
 				, qty_out
 				, m.item_name
 			FROM txn_log l INNER JOIN stock_master m ON m.item_code = l.item_code
-			WHERE l.item_code = $1 
-				AND location_id = ANY($2)
-				AND l.trans_date::date >= $3 AND l.trans_date::date <= $4
+			WHERE l.item_code = $1
+				AND l.trans_date::date >= $2 AND l.trans_date::date <= $3
 			ORDER BY l.trans_date`
 
-	fmt.Println(sql, arg.ItemCode, arg.Start, arg.End)
-
-	rows, err := database.PgPool.Query(ctx, sql, arg.ItemCode, arg.LocationIDs, arg.Start, arg.End)
+	rows, err := database.PgPool.Query(ctx, sql, arg.ItemCode, arg.Start, arg.End)
 	if err != nil {
 		return []Trail{}, err
 	}
 	defer rows.Close()
 
 	vals := []Trail{}
-	cTotal := float64(0)
+	cTotal := openingBal
 	for rows.Next() {
 		r := Trail{}
 

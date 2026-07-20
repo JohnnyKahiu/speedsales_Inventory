@@ -2,6 +2,7 @@ package count
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -173,10 +174,10 @@ func (arg *CountLog) FetchItems(ctxt context.Context) error {
 	}
 
 	sql := `
-		SELECT 
-			ci.auto_id, cl.count_id, ci.location_id, 
-			m.item_code, m.item_name, m.units_per_pack::float, m.dept_name, 
-			ci.counted, ci.system_bal
+		SELECT
+			ci.auto_id, cl.count_id, ci.location_id,
+			m.item_code, m.item_name, m.units_per_pack::float, m.dept_name,
+			ci.counted, ci.system_bal, ci.cases, ci.pieces, ci.count_trail::text, ci.is_adopted
 		FROM count_items ci
 			INNER JOIN count_log cl ON ci.count_num = cl.count_id
 			LEFT JOIN stock_master m ON m.item_code = ci.item_code
@@ -196,9 +197,15 @@ func (arg *CountLog) FetchItems(ctxt context.Context) error {
 	arg.Items = []CountItems{}
 	for rows.Next() {
 		r := CountItems{}
+		trailStr := ""
 		rows.Scan(&r.AutoID, &r.CountNum, &r.LocationID,
 			&r.ItemCode, &r.ItemName, &r.ItemsPerCase, &r.DeptName,
-			&r.Counted, &r.SystemBal)
+			&r.Counted, &r.SystemBal, &r.Cases, &r.Pieces, &trailStr, &r.IsAdopted)
+
+		// The column predates this field and some rows still hold its old
+		// non-array default ('{}'); treat anything that won't parse as a
+		// trail array as "never counted" rather than erroring the whole row.
+		json.Unmarshal([]byte(trailStr), &r.CountTrail)
 
 		arg.Items = append(arg.Items, r)
 	}

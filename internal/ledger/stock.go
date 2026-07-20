@@ -41,7 +41,7 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 
 	itemCode := vars["code"]
 
-	loc := products.Locations{StoreName: details.Branch}
+	loc := products.Locations{StoreName: details.ResolveBranch(r.URL.Query().Get("branch"))}
 	loc.GetAllLocInBranch(r.Context())
 
 	trail := ledger.Trail{
@@ -58,8 +58,6 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		respMap["trace"] = err
 		return respMap
 	}
-
-	fmt.Println("values =", vals)
 
 	respMap["response"] = "success"
 	respMap["item_name"] = trail.ItemName

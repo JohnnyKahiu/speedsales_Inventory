@@ -206,38 +206,8 @@ func (arg *TxnLog) ArchivePrev(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-// PurgePrev - removes all previous balances from current log to make it zero
-func (arg *TxnLog) PurgePrev(ctx context.Context, tx pgx.Tx) error {
-	// remove from txn_log
-	sql := `DELETE FROM txn_log WHERE trans_date < $1`
-	_, err := tx.Exec(ctx, sql, arg.TransDate)
-	if err != nil {
-		log.Println("postgresql error     delete from txn_log     err =", err)
-		return err
-	}
-
-	return nil
-}
-
-// SaveBal saves the balance to cache
-// returns an error if it fails
+// SaveBal writes the computed balance through to the in-memory cache.
 func (arg *TxnLog) SaveBal(ctx context.Context) error {
-	// cache the  balance
-	product := products.ProdMaster.ProductDB[arg.ItemCode]
-	LocBal := product.Balance[arg.LocationID]
-	LocBal = arg.Bal
-
-	if product.Balance == nil {
-		product.Balance = make(map[int64]float64)
-	}
-
-	product.Balance[arg.LocationID] = LocBal
-	product.Bal = arg.Bal
-
-	if products.ProdMaster.ProductDB == nil {
-		products.ProdMaster.ProductDB = make(map[string]products.StockMaster)
-	}
-
-	products.ProdMaster.ProductDB[arg.ItemCode] = product
-	return products.ProdMaster.Pickle()
+	products.ProdMaster.WriteBal(arg.ItemCode, arg.LocationID, arg.Bal)
+	return nil
 }

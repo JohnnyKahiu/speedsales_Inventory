@@ -31,6 +31,7 @@ func NewRouter() *mux.Router {
 	p.Use(JwtMiddleware)
 
 	p.HandleFunc("/app/{module}", AppGet).Methods("GET", "OPTIONS")
+	p.HandleFunc("/app/{module}", AppPost).Methods("POST", "OPTIONS")
 
 	p.HandleFunc("/products/search/{module}", SearchGet).Methods("GET", "OPTIONS")
 	p.HandleFunc("/products/balance/{module}", BalanceGet).Methods("GET", "OPTIONS")

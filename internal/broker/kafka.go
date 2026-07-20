@@ -17,6 +17,31 @@ type Kafka struct {
 	Payload    []byte
 }
 
+// Produce publishes a message onto the given topic
+func (b *Kafka) Produce(ctx context.Context) error {
+	writer := &kafka.Writer{
+		Addr:                   kafka.TCP(b.Broker),
+		Topic:                  b.Topic,
+		Balancer:               &kafka.LeastBytes{},
+		AllowAutoTopicCreation: true,
+	}
+	defer writer.Close()
+
+	err := writer.WriteMessages(ctx,
+		kafka.Message{
+			Key:   []byte(b.Key),
+			Value: b.Payload,
+		},
+	)
+	if err != nil {
+		log.Printf("write error: %v", err)
+		return err
+	}
+
+	fmt.Printf("\t published  key=%s  topic=%s\n", b.Key, b.Topic)
+	return nil
+}
+
 // ConsumeSalesOrders
 func (b *Kafka) ConsumeSalesOrders(ctx context.Context) error {
 	reader := kafka.NewReader(kafka.ReaderConfig{

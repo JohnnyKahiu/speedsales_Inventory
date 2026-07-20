@@ -358,6 +358,26 @@ func (arg *ProdDB) DelLink(link string) error {
 	return nil
 }
 
+// WriteBal updates the in-memory balance for itemCode/locationID under the
+// write lock (write-through cache), then persists asynchronously via Pickle.
+func (arg *ProdDB) WriteBal(itemCode string, locationID int64, bal float64) {
+	arg.mx.Lock()
+	product := arg.ProductDB[itemCode]
+	if product.Balance == nil {
+		product.Balance = make(map[int64]float64)
+	}
+	product.Balance[locationID] = bal
+	product.Bal = bal
+	arg.ProductDB[itemCode] = product
+	arg.mx.Unlock()
+
+	go func() {
+		if err := arg.Pickle(); err != nil {
+			log.Println("WriteBal: pickle error    err =", err)
+		}
+	}()
+}
+
 func (arg *ProdDB) Pickle() error {
 	buf := &bytes.Buffer{}
 	err := gob.NewEncoder(buf).Encode(arg)

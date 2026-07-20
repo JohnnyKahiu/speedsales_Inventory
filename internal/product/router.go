@@ -438,9 +438,8 @@ func GetGroups(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 		return respMap
 
 	case "bins":
-		// log.Fatalln("branch = ", details.Branch)
 		stkLoc := products.Locations{
-			StoreName: details.Branch,
+			StoreName: details.ResolveBranch(r.URL.Query().Get("branch")),
 		}
 
 		vals, err := stkLoc.Fetch()

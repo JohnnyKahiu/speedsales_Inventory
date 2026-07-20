@@ -137,13 +137,13 @@ func (arg *Locations) GetSaleLoc(ctx context.Context) error {
 // inserts into stock_locations table
 // returns an error if it fails
 func (arg *Locations) GenNew(ctx context.Context) error {
-	sql := `INSERT INTO stock_locations (store_num, store_name, storage_location, aisle, level)
-			VALUES($1, $2, $3, $4, $5)`
+	sql := `INSERT INTO stock_locations (store_num, store_name, storage_location, aisle, level, is_sale_loc)
+			VALUES($1, $2, $3, $4, $5, $6)`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	_, err := database.PgPool.Exec(ctx, sql, arg.StoreNum, arg.StoreName, arg.StorageLoc, arg.Aisle, arg.Level)
+	_, err := database.PgPool.Exec(ctx, sql, arg.StoreNum, arg.StoreName, arg.StorageLoc, arg.Aisle, arg.Level, arg.IsSaleLoc)
 	if err != nil {
 		log.Println("error failed to add new stock_location    err =", err)
 		return err
@@ -156,13 +156,14 @@ func (arg *Locations) GenNew(ctx context.Context) error {
 // queries stock_locations database
 // returns a slice of locations or error if it fails
 func (arg *Locations) Fetch() ([]Locations, error) {
-	sql := `SELECT 
-				auto_id, store_num, 
-				store_name, storage_location, 
-				aisle, level, 
-				stock_list
-			FROM stock_locations 
-			WHERE store_name = $1 OR store_num = $2
+	sql := `SELECT
+				auto_id, store_num,
+				store_name, storage_location,
+				aisle, level,
+				stock_list,
+				coalesce(is_sale_loc, false)
+			FROM stock_locations
+			WHERE TRIM(LOWER(store_name)) = TRIM(LOWER($1)) OR store_num = $2
 			ORDER BY storage_location, auto_id`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -179,7 +180,7 @@ func (arg *Locations) Fetch() ([]Locations, error) {
 	vals := []Locations{}
 	for rows.Next() {
 		r := Locations{}
-		err := rows.Scan(&r.AutoID, &r.StoreNum, &r.StoreName, &r.StorageLoc, &r.Aisle, &r.Level, &r.StockList)
+		err := rows.Scan(&r.AutoID, &r.StoreNum, &r.StoreName, &r.StorageLoc, &r.Aisle, &r.Level, &r.StockList, &r.IsSaleLoc)
 		if err != nil {
 			log.Println("error scannig locations data    err =", err)
 			return vals, nil
@@ -194,6 +195,43 @@ func (arg *Locations) Fetch() ([]Locations, error) {
 			return vals, nil
 		}
 
+		vals = append(vals, r)
+	}
+
+	return vals, nil
+}
+
+// FetchAll returns every location across all branches
+func (arg *Locations) FetchAll() ([]Locations, error) {
+	sql := `SELECT
+				auto_id, store_num,
+				store_name, storage_location,
+				aisle, level,
+				stock_list,
+				coalesce(is_sale_loc, false)
+			FROM stock_locations
+			ORDER BY store_name, storage_location, auto_id`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	rows, err := database.PgPool.Query(ctx, sql)
+	if err != nil {
+		log.Println("postgres error.    err =", err)
+		return []Locations{}, err
+	}
+	defer rows.Close()
+
+	vals := []Locations{}
+	for rows.Next() {
+		r := Locations{}
+		if err := rows.Scan(&r.AutoID, &r.StoreNum, &r.StoreName, &r.StorageLoc, &r.Aisle, &r.Level, &r.StockList, &r.IsSaleLoc); err != nil {
+			log.Println("error scanning locations data    err =", err)
+			return vals, err
+		}
+		if r.StockList == nil {
+			r.StockList = []string{}
+		}
 		vals = append(vals, r)
 	}
 

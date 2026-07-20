@@ -21,6 +21,36 @@ func POST(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 
 	switch m {
 	case "new_branch":
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			respMap["response"] = "error"
+			respMap["message"] = "invalid params"
+			return respMap
+		}
+
+		loc := products.Locations{}
+		if err = json.Unmarshal(b, &loc); err != nil {
+			log.Println("failed to unmarshal location json    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "json error"
+			return respMap
+		}
+
+		if loc.StoreName == "" || loc.StorageLoc == "" {
+			respMap["response"] = "error"
+			respMap["message"] = "branch and location name are required"
+			return respMap
+		}
+
+		if err = loc.GenNew(r.Context()); err != nil {
+			log.Println("failed to create new stock location    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to create location"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["message"] = "Location created"
 		return respMap
 
 	case "add_to_stock_list":
@@ -102,10 +132,24 @@ func GET(w http.ResponseWriter, r *http.Request) map[string]interface{} {
 			return respMap
 		}
 
-		loc := products.Locations{StoreName: details.Branch}
+		loc := products.Locations{StoreName: details.ResolveBranch(r.URL.Query().Get("branch"))}
 		vals, err := loc.Fetch()
 		if err != nil {
 			log.Println("failed to fetch locations    err =", err)
+			respMap["response"] = "error"
+			respMap["message"] = "failed to fetch locations"
+			return respMap
+		}
+
+		respMap["response"] = "success"
+		respMap["values"] = vals
+		return respMap
+
+	case "all":
+		loc := products.Locations{}
+		vals, err := loc.FetchAll()
+		if err != nil {
+			log.Println("failed to fetch all locations    err =", err)
 			respMap["response"] = "error"
 			respMap["message"] = "failed to fetch locations"
 			return respMap

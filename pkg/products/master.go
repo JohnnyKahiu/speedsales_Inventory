@@ -2,7 +2,6 @@ package products
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -349,14 +348,46 @@ func (val *StockMaster) StockCalcs() error {
 // Receives a StockMaster struct
 // Adds to database and cache
 // Returns an error if fails
-func (arg *StockMaster) CreateNew() error {
-	if arg.ItemCode == "" {
-		log.Println("failed to create new item. item code is required")
-		return errors.New("item code is required")
+// genItemCode generates a unique item code in the format {dept_code}.{n}.
+// It derives the starting n from the highest suffix already used for this department,
+// then increments until it finds a code not yet in stock_master.
+func genItemCode(ctx context.Context, deptCode int32) (string, error) {
+	var count int64
+	err := database.PgPool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM stock_master WHERE dept_code = $1`, deptCode,
+	).Scan(&count)
+	if err != nil {
+		return "", fmt.Errorf("failed to count items in dept %d: %w", deptCode, err)
 	}
 
+	for n := count + 1; ; n++ {
+		candidate := fmt.Sprintf("%d.%d", deptCode, n)
+		var exists bool
+		err = database.PgPool.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM stock_master WHERE item_code = $1)`, candidate,
+		).Scan(&exists)
+		if err != nil {
+			return "", fmt.Errorf("failed to check item_code uniqueness: %w", err)
+		}
+		if !exists {
+			return candidate, nil
+		}
+	}
+}
+
+func (arg *StockMaster) CreateNew() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	if arg.ItemCode == "" {
+		code, err := genItemCode(ctx, arg.DeptCode)
+		if err != nil {
+			log.Println("failed to generate item code    err =", err)
+			return err
+		}
+		arg.ItemCode = code
+		log.Println("generated item_code =", arg.ItemCode)
+	}
 
 	tx, err := database.PgPool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

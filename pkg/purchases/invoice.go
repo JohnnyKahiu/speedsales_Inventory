@@ -2,14 +2,35 @@ package purchases
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/JohnnyKahiu/speedsales_inventory/database"
+	"github.com/JohnnyKahiu/speedsales_inventory/internal/broker"
 	"github.com/JohnnyKahiu/speedsales_inventory/pkg/balances"
 	"github.com/jackc/pgx/v5"
 )
+
+// PurchaseEvent is the contract published to the "purchases" topic for the
+// Accounts service to consume and post as an accounts payable bill.
+type PurchaseEvent struct {
+	GrnNum         int64   `json:"grn_num"`
+	SuppPin        string  `json:"supp_pin"`
+	SuppName       string  `json:"supp_name"`
+	InvNum         string  `json:"inv_num"`
+	InvType        string  `json:"inv_type"`
+	InvDate        string  `json:"inv_date"`
+	RecvDate       string  `json:"recv_date"`
+	TotalExc       float64 `json:"total_exc"`
+	TotalVat       float64 `json:"total_vat"`
+	TotalAmountInc float64 `json:"total_amount_inc"`
+	Discount       float64 `json:"discount"`
+	Branch         string  `json:"branch"`
+	Poster         string  `json:"poster"`
+}
 
 type GrnLog struct {
 	table          string    `name:"grn_log" type:"table"`
@@ -526,5 +547,48 @@ func (arg *GrnLog) Complete(ctxt context.Context) error {
 		fmt.Printf("\t added txn_log  item = %v \t location = %v\n", itm.ItemCode, itm.LocationID)
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	arg.publishPurchaseEvent(ctx)
+
+	return nil
+}
+
+// publishPurchaseEvent notifies the Accounts service that a purchase bill is ready to be posted.
+// Publish failures are logged, not returned: the GRN has already been committed and
+// should not be rolled back over a downstream notification issue.
+func (arg *GrnLog) publishPurchaseEvent(ctx context.Context) {
+	event := PurchaseEvent{
+		GrnNum:         arg.GrnNum,
+		SuppPin:        arg.SuppPin,
+		SuppName:       arg.SuppName,
+		InvNum:         arg.InvNum,
+		InvType:        arg.InvType,
+		InvDate:        arg.InvDate,
+		RecvDate:       arg.RecvDate,
+		TotalExc:       arg.TotalExc,
+		TotalVat:       arg.TotalVat,
+		TotalAmountInc: arg.TotalAmountInc,
+		Discount:       arg.Discount,
+		Branch:         arg.Branch,
+		Poster:         arg.Poster,
+	}
+
+	payload, err := json.Marshal(event)
+	if err != nil {
+		log.Println("error. failed to marshal purchase event    err =", err)
+		return
+	}
+
+	kf := broker.Kafka{
+		Broker:  os.Getenv("KAFKA_BROKER"),
+		Topic:   "purchases",
+		Key:     fmt.Sprintf("%v", arg.GrnNum),
+		Payload: payload,
+	}
+	if err := kf.Produce(ctx); err != nil {
+		log.Println("kafka error    failed to publish purchase event    err =", err)
+	}
 }

@@ -2,6 +2,7 @@ package count
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -24,12 +25,13 @@ type CountItems struct {
 	Pieces       float64      `json:"pieces" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
 	Counted      float64      `json:"counted" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
 	SystemBal    float64      `json:"system_bal" type:"field" sql:"FLOAT NOT NULL DEFAULT '0'"`
+	CountTrail   []countTrail `json:"count_trail" type:"field" sql:"JSONB NOT NULL DEFAULT '{}'"`
+	IsAdopted    bool         `json:"is_adopted" type:"field" sql:"BOOL NOT NULL DEFAULT 'false'"`
 	pkey         string       `name:"count_items_pk" type:"constraint" sql:"PRIMARY KEY (auto_id)"`
 	DeptName     string       `json:"dept_name"`
 	ItemName     string       `json:"item_name"`
 	AutoIDs      []int64      `json:"auto_ids"`
 	LogIDs       []int64      `json:"log_ids"`
-	CountTrail   []countTrail `json:"count_trail"`
 }
 
 type countTrail struct {
@@ -56,6 +58,20 @@ func GenCountTbls() error {
 	return genCountItemsTbl()
 }
 
+// AppendTrail records a count-trail entry for the current save, marking this
+// item as counted. Callers should set arg's Cases/Pieces/etc. beforehand.
+func (arg *CountItems) AppendTrail(poster string) {
+	arg.CountTrail = append(arg.CountTrail, countTrail{
+		TransDate:    time.Now(),
+		Poster:       poster,
+		LocationID:   arg.LocationID,
+		ItemCode:     arg.ItemCode,
+		Cases:        arg.Cases,
+		UnitsPerPack: arg.ItemsPerCase,
+		Pieces:       arg.Pieces,
+	})
+}
+
 // Count - records items counted
 // Receives a context and updates count_items with count details and system_bal
 // Returns an error if it occurs
@@ -63,19 +79,25 @@ func (arg *CountItems) Count(ctxt context.Context) error {
 	fmt.Printf("\t pieces = %v \n\t counted = %v \n\t balance = %v \n\t auto_id = %v \n counted = %v \n\n", arg.Pieces, arg.Counted, arg.SystemBal, arg.AutoID, arg.Counted)
 	sql := `
 		UPDATE count_items
-		SET 
+		SET
 			pieces = $1
 			, cases = $2
 			, items_per_case = $3
 			, counted = $4
 			, system_bal = $5
 			, trans_date = now()
-		WHERE auto_id = $6`
+			, count_trail = $6::jsonb
+		WHERE auto_id = $7`
 
 	ctx, cancel := context.WithTimeout(ctxt, 15*time.Second)
 	defer cancel()
 
-	_, err := database.PgPool.Exec(ctx, sql, arg.Pieces, arg.Cases, arg.ItemsPerCase, arg.Counted, arg.SystemBal, arg.AutoID)
+	trails, err := json.Marshal(arg.CountTrail)
+	if err != nil {
+		return err
+	}
+
+	_, err = database.PgPool.Exec(ctx, sql, arg.Pieces, arg.Cases, arg.ItemsPerCase, arg.Counted, arg.SystemBal, string(trails), arg.AutoID)
 	if err != nil {
 		log.Println("error, failed to insert into count_items.    err =", err)
 		return err
@@ -164,6 +186,62 @@ func (arg *CountItems) GetById(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
+// nullifyBeforeCount cancels out whatever balance this item had as at
+// arg.TransDate, so adoptedCount doesn't just stack the counted quantity on
+// top of the old balance — txn_log's balance is SUM(qty_in - qty_out) over
+// all history, and prior rows are archived (copied), never deleted, so
+// without this the old balance would still count alongside the new one.
+func (arg *CountItems) nullifyBeforeCount(ctxt context.Context, tx pgx.Tx) error {
+	b := balances.Balance{
+		LocationID: fmt.Sprintf("%v", arg.LocationID),
+		ItemCode:   arg.ItemCode,
+	}
+	if err := b.GetBal(); err != nil {
+		fmt.Println("error, failed to get balance    err =", err)
+		return err
+	}
+
+	nullify := balances.TxnLog{
+		TransDate:   arg.TransDate,
+		TxnID:       fmt.Sprintf("%v", arg.CountNum),
+		ItemCode:    arg.ItemCode,
+		Description: "adopted old stock nullified",
+		LocationID:  arg.LocationID,
+	}
+	if b.Bal >= 0 {
+		nullify.QtyOut = b.Bal
+	} else {
+		nullify.QtyIn = -b.Bal
+	}
+
+	return nullify.LogBalTx(ctxt, tx)
+}
+
+// adoptedCount records the newly counted balance as at arg.TransDate, archives
+// everything logged before that point, and marks this item adopted so it
+// can't be adopted again.
+func (arg *CountItems) adoptedCount(ctxt context.Context, tx pgx.Tx) error {
+	adopted := balances.TxnLog{
+		TransDate:   arg.TransDate,
+		TxnID:       fmt.Sprintf("%v", arg.CountNum),
+		ItemCode:    arg.ItemCode,
+		Description: "adopted new count",
+		LocationID:  arg.LocationID,
+		QtyIn:       arg.Counted,
+	}
+	if err := adopted.LogBalTx(ctxt, tx); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctxt, `UPDATE count_items SET is_adopted = true WHERE auto_id = $1`, arg.AutoID); err != nil {
+		log.Println("postgresql error. failed to mark count_item adopted    err =", err)
+		return err
+	}
+
+	arg.IsAdopted = true
+	return nil
+}
+
 // AdoptItem = adopts stock balance from count
 // archives
 func (arg *CountItems) AdoptItem(ctxt context.Context) error {
@@ -182,43 +260,15 @@ func (arg *CountItems) AdoptItem(ctxt context.Context) error {
 	for _, id := range arg.AutoIDs {
 		arg.AutoID = id
 
-		err = arg.GetById(ctx, tx)
-		if err != nil {
+		if err = arg.GetById(ctx, tx); err != nil {
 			return err
 		}
 
-		b := balances.Balance{
-			LocationID: fmt.Sprintf("%v", arg.LocationID),
-			ItemCode:   arg.ItemCode,
-		}
-		b.GetBal()
-
-		txn := balances.TxnLog{
-			TransDate:   arg.TransDate,
-			TxnID:       fmt.Sprintf("%v", arg.CountNum),
-			ItemCode:    arg.ItemCode,
-			Description: "adopted stock count",
-			LocationID:  arg.LocationID,
-			QtyIn:       arg.Counted,
-			QtyOut:      0,
-		}
-		err = txn.LogBalTx(ctx, tx)
-		if err != nil {
+		if err = arg.nullifyBeforeCount(ctx, tx); err != nil {
 			return err
 		}
 
-		err = txn.SaveBal(ctx)
-		if err != nil {
-			return err
-		}
-
-		err = txn.ArchivePrev(ctx, tx)
-		if err != nil {
-			return err
-		}
-
-		err = txn.PurgePrev(ctx, tx)
-		if err != nil {
+		if err = arg.adoptedCount(ctx, tx); err != nil {
 			return err
 		}
 	}
